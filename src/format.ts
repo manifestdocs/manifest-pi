@@ -4,7 +4,7 @@
  * Ported from manifest-server/src/mcp/tools/format.rs and tree_render.rs.
  */
 
-import type { FeatureTreeNode, BreadcrumbItem, ProjectHistoryEntry } from './types.js';
+import type { FeatureTreeNode, FeatureWithContext, BreadcrumbItem, ProjectHistoryEntry } from './types.js';
 
 // ============================================================
 // State Symbols
@@ -51,6 +51,61 @@ export function displayId(
     return uuid.slice(0, 8);
   }
   return '?';
+}
+
+// ============================================================
+// Feature Card
+// ============================================================
+
+/**
+ * Render a feature as a compact card suitable for direct display.
+ * Designed so agents can pass it through without reformatting.
+ */
+export function renderFeatureCard(ctx: FeatureWithContext): string {
+  const id = ctx.display_id ?? ctx.id.slice(0, 8);
+  const sym = stateSymbol(ctx.state);
+  const W = 60;
+  const hr = '\u2500'.repeat(W);
+
+  const lines: string[] = [];
+
+  // Header
+  lines.push(hr);
+  lines.push(`${sym} ${id}  ${ctx.title}`);
+  lines.push(`  State: ${ctx.state}  Priority: ${ctx.priority}`);
+  if (ctx.parent) lines.push(`  Parent: ${ctx.parent.title}`);
+  lines.push(hr);
+
+  // Details / spec
+  if (ctx.details) {
+    lines.push('');
+    lines.push(ctx.details);
+  } else {
+    lines.push('');
+    lines.push('(no spec written yet)');
+  }
+
+  // Desired changes (change request)
+  if (ctx.desired_details) {
+    lines.push('');
+    lines.push(`${'- '.repeat(30)}`);
+    lines.push('Requested changes:');
+    lines.push(ctx.desired_details);
+  }
+
+  // Children (feature set)
+  if (ctx.children.length > 0) {
+    lines.push('');
+    lines.push(hr);
+    lines.push(`Children (${ctx.children.length}):`);
+    for (const child of ctx.children) {
+      const cid = child.display_id ?? child.id?.slice(0, 8) ?? '';
+      lines.push(`  ${stateSymbol(child.state)} ${cid} ${child.title}`);
+    }
+  }
+
+  lines.push(hr);
+  return lines.join('\n');
 }
 
 // ============================================================

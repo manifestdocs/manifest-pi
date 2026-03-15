@@ -4,7 +4,7 @@
 
 import type { ManifestClient } from '../client.js';
 import { ApiError, ConflictError, ConnectionError } from '../client.js';
-import { renderTree, filterTree, stateSymbol, markdownTable, lodBreadcrumb } from '../format.js';
+import { renderTree, filterTree, stateSymbol, markdownTable, lodBreadcrumb, renderFeatureCard } from '../format.js';
 
 // ============================================================
 // list_projects
@@ -68,11 +68,12 @@ export async function handleFindFeatures(
 
     const rows = features.map((f: any) => [
       f.display_id ?? f.id.slice(0, 8),
+      f.id,
       stateSymbol(f.state),
       String(f.priority),
       f.title,
     ]);
-    return markdownTable(['ID', 'State', 'P', 'Title'], rows);
+    return markdownTable(['ID', 'UUID', 'State', 'P', 'Title'], rows);
   } catch (err) {
     return handleError(err);
   }
@@ -84,8 +85,8 @@ export async function handleFindFeatures(
 
 interface GetFeatureParams {
   feature_id: string;
+  view?: 'card' | 'full';
   include_history?: boolean;
-  depth?: string;
 }
 
 export async function handleGetFeature(
@@ -94,6 +95,14 @@ export async function handleGetFeature(
 ): Promise<string> {
   try {
   const ctx = await client.getFeatureContext(params.feature_id);
+  const view = params.view ?? 'card';
+
+  // Card view — compact, pre-formatted, ready for direct display
+  if (view === 'card') {
+    return renderFeatureCard(ctx);
+  }
+
+  // Full view — includes breadcrumb context, siblings, and optional history
   const parts: string[] = [];
 
   // Header
@@ -136,7 +145,8 @@ export async function handleGetFeature(
     parts.push('');
     parts.push('## Children');
     for (const child of ctx.children) {
-      parts.push(`  ${stateSymbol(child.state)} ${child.title}`);
+      const cid = child.display_id ?? child.id?.slice(0, 8) ?? '';
+      parts.push(`  ${stateSymbol(child.state)} ${cid} ${child.title}`);
     }
   }
 
@@ -145,12 +155,13 @@ export async function handleGetFeature(
     parts.push('');
     parts.push('## Siblings');
     for (const sib of ctx.siblings) {
-      parts.push(`  ${stateSymbol(sib.state)} ${sib.title}`);
+      const sid = sib.display_id ?? sib.id?.slice(0, 8) ?? '';
+      parts.push(`  ${stateSymbol(sib.state)} ${sid} ${sib.title}`);
     }
   }
 
   // History
-  if (params.include_history || params.depth === 'deep') {
+  if (params.include_history) {
     const history = await client.getFeatureHistory(params.feature_id);
     if (history.length > 0) {
       parts.push('');
@@ -437,7 +448,8 @@ function formatFeatureSummary(feature: any): string {
     parts.push('');
     parts.push('## Children');
     for (const child of feature.children) {
-      parts.push(`  ${stateSymbol(child.state)} ${child.title}`);
+      const cid = child.display_id ?? child.id?.slice(0, 8) ?? '';
+      parts.push(`  ${stateSymbol(child.state)} ${cid} ${child.title}`);
     }
   }
 
@@ -446,7 +458,8 @@ function formatFeatureSummary(feature: any): string {
     parts.push('');
     parts.push('## Siblings');
     for (const sib of feature.siblings) {
-      parts.push(`  ${stateSymbol(sib.state)} ${sib.title}`);
+      const sid = sib.display_id ?? sib.id?.slice(0, 8) ?? '';
+      parts.push(`  ${stateSymbol(sib.state)} ${sid} ${sib.title}`);
     }
   }
 

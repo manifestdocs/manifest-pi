@@ -132,12 +132,12 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
 
   pi.registerTool({
     name: 'manifest_get_feature',
-    description: 'Get detailed feature spec with hierarchical context. Returns breadcrumb with ancestor context.',
-    label: 'Get full Manifest feature details with context',
+    description: 'Get feature details. Default view is a compact card. Use view="full" for breadcrumb context, siblings, and history.',
+    label: 'Get Manifest feature details',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID (e.g., MAN-42)' }),
-      include_history: Type.Optional(Type.Boolean({ description: 'Include implementation history. Default false.' })),
-      depth: Type.Optional(StringEnum(["shallow", "standard", "deep"] as const, { description: "Context depth" })),
+      view: Type.Optional(StringEnum(["card", "full"] as const, { description: 'Display format. "card" (default): compact feature card. "full": includes breadcrumb, siblings, history.' })),
+      include_history: Type.Optional(Type.Boolean({ description: 'Include implementation history. Only used with view="full". Default false.' })),
     }),
     async execute(_id: string, params: any) {
       const text = await handleGetFeature(client, params);
@@ -251,7 +251,7 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
 
   pi.registerTool({
     name: 'manifest_prove_feature',
-    description: 'Record test evidence for a feature. Creates a proof with command, exit code, and structured results.',
+    description: 'Record test evidence for a feature. Creates a proof with command, exit code, and structured results. IMPORTANT: Parse test output into individual test entries (one per test case). Use verbose flags (rspec --format documentation, pytest -v, go test -v) to get parseable output. Never collapse multiple tests into one entry.',
     label: 'Record test proof for a Manifest feature',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),

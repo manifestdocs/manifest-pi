@@ -157,6 +157,7 @@ describe('discovery tools', () => {
 
       const result = await handleGetFeature(client, {
         feature_id: '1',
+        view: 'full',
         include_history: true,
       });
       expect(client.getFeatureHistory).toHaveBeenCalledWith('1');

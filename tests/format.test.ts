@@ -11,8 +11,9 @@ import {
   renderTestTree,
   renderProofChecklist,
   renderActivityTimeline,
+  renderFeatureCard,
 } from '../src/format.js';
-import type { FeatureTreeNode, BreadcrumbItem, ProjectHistoryEntry } from '../src/types.js';
+import type { FeatureTreeNode, FeatureWithContext, BreadcrumbItem, ProjectHistoryEntry } from '../src/types.js';
 
 describe('format', () => {
   describe('stateSymbol', () => {
@@ -348,6 +349,78 @@ describe('format', () => {
       const output = renderActivityTimeline(entries);
       expect(output).toContain('>> ');
       expect(output).toContain('Released v0.2.0');
+    });
+  });
+
+  describe('renderFeatureCard', () => {
+    function makeCtx(overrides: Partial<FeatureWithContext> = {}): FeatureWithContext {
+      return {
+        id: 'aaaa-bbbb-cccc-dddd',
+        display_id: 'MAN-42',
+        title: 'OAuth Login',
+        state: 'proposed',
+        priority: 1,
+        details: 'As a user, I can log in via OAuth.\n\n- [ ] Google provider\n- [ ] GitHub provider',
+        desired_details: null,
+        parent: { id: 'p1', title: 'Authentication', state: 'proposed' },
+        siblings: [],
+        children: [],
+        breadcrumb: [],
+        ...overrides,
+      };
+    }
+
+    it('renders header with display ID, title, state, and priority', () => {
+      const output = renderFeatureCard(makeCtx());
+      expect(output).toContain('MAN-42');
+      expect(output).toContain('OAuth Login');
+      expect(output).toContain('proposed');
+      expect(output).toContain('Priority: 1');
+      expect(output).toContain('Parent: Authentication');
+    });
+
+    it('renders details/spec content', () => {
+      const output = renderFeatureCard(makeCtx());
+      expect(output).toContain('As a user, I can log in via OAuth.');
+      expect(output).toContain('- [ ] Google provider');
+    });
+
+    it('shows placeholder when no details', () => {
+      const output = renderFeatureCard(makeCtx({ details: null }));
+      expect(output).toContain('(no spec written yet)');
+    });
+
+    it('renders children for feature sets', () => {
+      const output = renderFeatureCard(makeCtx({
+        children: [
+          { id: 'c1', display_id: 'MAN-43', title: 'Google OAuth', state: 'implemented' },
+          { id: 'c2', display_id: 'MAN-44', title: 'GitHub OAuth', state: 'proposed' },
+        ],
+      }));
+      expect(output).toContain('Children (2)');
+      expect(output).toContain('MAN-43 Google OAuth');
+      expect(output).toContain('MAN-44 GitHub OAuth');
+    });
+
+    it('renders desired_details for change requests', () => {
+      const output = renderFeatureCard(makeCtx({
+        desired_details: 'Add Apple sign-in support',
+      }));
+      expect(output).toContain('Requested changes');
+      expect(output).toContain('Add Apple sign-in support');
+    });
+
+    it('falls back to UUID prefix when no display_id', () => {
+      const output = renderFeatureCard(makeCtx({ display_id: null }));
+      expect(output).toContain('aaaa-bbb');
+    });
+
+    it('uses horizontal rules as card borders', () => {
+      const output = renderFeatureCard(makeCtx());
+      const lines = output.split('\n');
+      // First and last non-empty lines should be horizontal rules
+      expect(lines[0]).toMatch(/^─+$/);
+      expect(lines[lines.length - 1]).toMatch(/^─+$/);
     });
   });
 });
