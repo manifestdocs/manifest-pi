@@ -12,7 +12,9 @@ ALWAYS pass `directory_path` (current working directory) when calling `manifest_
 
 ## Output rules
 
-Tool results ARE your response. Do NOT summarize, add a legend, or editorialize after a tool returns formatted output.
+Tool results ARE your response. Do NOT summarize, reformat, or editorialize after a tool returns formatted output.
+
+When the user says "show me the feature", "feature card", or "show details" — call `manifest_get_feature` with default view (card). Display the result directly. Do NOT reformat it into your own layout.
 
 ## Workflow
 
@@ -51,17 +53,69 @@ Do not suggest new work until all stale features are resolved.
 | "what's next", "next feature" | `manifest_get_next_feature` (server checks for in_progress first) |
 | "show the tree", "feature tree" | `manifest_render_feature_tree` |
 | "show history", "activity" | `manifest_get_project_history` |
+| "show me the feature", "feature card", "show details" | `manifest_get_feature` (default card view) |
+| "full context", "show breadcrumb", "show history" | `manifest_get_feature` with `view: "full"` |
 | "this feature", "active feature" | `manifest_get_active_feature` |
 | "plan this", "break this down" | `manifest_plan` |
+| "check the X feature set", "is X done" | `manifest_find_features` → `manifest_get_feature` on matches |
+| "show versions", "roadmap" | `manifest_list_versions` |
+| "review against spec", "verify feature" | `manifest_verify_feature` or `manifest_get_feature` + compare |
 
 ## Agents
 
 If `dispatch_agent` is available, delegate to specialist agents:
 
-- **navigator** — read-only queries (tree, search, history, versions)
-- **feature-worker** — implementation lifecycle (claim, build, prove, complete)
-- **product-manager** — specs, planning, versions, reviews
+- **product-manager** — specs, planning, versions, reviews, verification
+- **feature-engineer** — implementation lifecycle (claim, build, prove, complete)
 - **code-reviewer** — verify implementations against specs, triage stale features
+
+### Team workflow (when dispatch_agent is available)
+
+When the user says "work on feature X", "implement feature X", or "what's next", activate the deterministic feature workflow:
+
+1. **Spec phase**: Dispatch product-manager to write/refine the spec with user story, acceptance criteria, and contract/API shape. The spec must pass the quality gate (user story + checkboxes + 50+ chars).
+2. **Implementation phase**: Dispatch feature-engineer to implement via TDD (red > green), covering happy path + error cases.
+3. **Review phase**: Dispatch code-reviewer to check code quality, then product-manager to review specs vs implementation. Loop until verification passes.
+4. **Completion phase**: Dispatch feature-engineer to call manifest_complete_feature.
+
+For one-off tasks ("update the header", "fix the typo"), handle directly without dispatching.
+
+## Recording test proof
+
+When calling `manifest_prove_feature`, parse test output into **individual test entries** — one per test case, not one per file or suite. The UI displays each entry separately so summarizing defeats the purpose.
+
+**How to parse**: Run tests with a format that lists individual examples. Parse each line into a structured entry.
+
+| Framework | Flag | Parse pattern |
+|---|---|---|
+| RSpec | `--format documentation` | Indented lines = suite/test hierarchy. "FAILED" suffix = failed. |
+| Vitest / Jest | default | Lines like `✓ test name (Xms)` or `✗ test name` |
+| pytest | `-v` | Lines like `test_file.py::test_name PASSED` |
+| Go test | `-v` | Lines like `--- PASS: TestName (0.01s)` |
+
+**Example** — RSpec with `--format documentation` outputs:
+```
+Pet Management
+  GET /api/v1/pets/:id
+    returns 200 with pet data
+    returns 403 when scope is wrong
+```
+
+Parse into:
+```json
+{
+  "test_suites": [{
+    "name": "Pet Management",
+    "file": "spec/requests/api/v1/pets_spec.rb",
+    "tests": [
+      { "name": "GET /api/v1/pets/:id returns 200 with pet data", "state": "passed" },
+      { "name": "GET /api/v1/pets/:id returns 403 when scope is wrong", "state": "passed" }
+    ]
+  }]
+}
+```
+
+NEVER collapse multiple test examples into a single entry. If rspec says "58 examples, 0 failures", there must be 58 entries in `tests`, not 1.
 
 ## Rules
 
