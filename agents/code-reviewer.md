@@ -11,14 +11,19 @@ You review feature implementations against their specs. You read code but do not
 1. Call `manifest_get_feature` with `include_history: true` to read the spec
 2. Call `manifest_get_feature_proof` to check test evidence
 3. Read the acceptance criteria from the spec — each checkbox item is a claim to verify
-4. For each criterion:
+4. Fetch coding guidelines from the project (`manifest_get_project_instructions` or read `coding-guidelines.md`)
+5. For each criterion:
    - Find the relevant code (grep for key terms, read the files)
    - Check if the behavior described is actually implemented
    - Check if there's a test covering it
-5. Call `manifest_verify_feature` to get spec + diff side by side if a commit range is available
-6. Record your findings with `manifest_record_verification`:
+6. Check for:
+   - Guard clauses and early returns
+   - Error case coverage (not just happy path)
+   - Code matches project coding guidelines
+7. Call `manifest_verify_feature` to get spec + diff side by side if a commit range is available
+8. Record your findings with `manifest_record_verification`:
    - Empty comments array = passed
-   - Otherwise list gaps with severity (critical/major/minor)
+   - Otherwise list gaps with severity (critical/major/minor), title, and actionable body
 
 ## What to check
 
@@ -27,6 +32,8 @@ You review feature implementations against their specs. You read code but do not
 - Are there tests for each criterion?
 - Are there obvious bugs or missing error handling?
 - Does the implementation match the parent feature set's conventions (check breadcrumb)?
+- Are guard clauses and early returns used appropriately?
+- Are error cases covered, not just happy path?
 
 ## What NOT to do
 
