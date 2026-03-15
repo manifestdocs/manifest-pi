@@ -3,7 +3,8 @@
  */
 
 import type { ManifestClient } from '../client.js';
-import { renderTree, stateSymbol, markdownTable, lodBreadcrumb } from '../format.js';
+import { ApiError, ConflictError, ConnectionError } from '../client.js';
+import { renderTree, filterTree, stateSymbol, markdownTable, lodBreadcrumb } from '../format.js';
 
 // ============================================================
 // list_projects
@@ -17,15 +18,30 @@ export async function handleListProjects(
   client: ManifestClient,
   params: ListProjectsParams,
 ): Promise<string> {
-  if (params.directory_path) {
-    const resp = await client.listProjectsByDirectory(params.directory_path);
-    return formatResponse(resp);
+  try {
+    if (params.directory_path) {
+      const resp = await client.listProjectsByDirectory(params.directory_path) as any;
+      if (!resp || (!resp.id && (!resp.project || !resp.project.id))) return 'No projects found.';
+      const project = resp.project ?? resp;
+      return formatProjectSummary(project);
+    }
+    const projects = await client.listProjects();
+    if (projects.length === 0) return 'No projects found.';
+    if (projects.length === 1) return formatProjectSummary(projects[0]);
+    const rows = projects.map((p: any) => [p.id, p.name, p.description ?? '']);
+    return markdownTable(['ID', 'Name', 'Description'], rows);
+  } catch (err) {
+    return handleError(err);
   }
-  const projects = await client.listProjects();
-  if (projects.length === 0) return 'No projects found.';
-  if (projects.length === 1) return formatResponse(projects[0]);
-  const rows = projects.map((p: any) => [p.id, p.name, p.description ?? '']);
-  return markdownTable(['ID', 'Name', 'Description'], rows);
+}
+
+function formatProjectSummary(project: any): string {
+  const parts: string[] = [];
+  parts.push(`Project: ${project.name}`);
+  parts.push(`ID: ${project.id}`);
+  if (project.description) parts.push(`Description: ${project.description}`);
+  if (project.key_prefix) parts.push(`Key prefix: ${project.key_prefix}`);
+  return parts.join('\n');
 }
 
 // ============================================================
@@ -46,16 +62,20 @@ export async function handleFindFeatures(
   client: ManifestClient,
   params: FindFeaturesParams,
 ): Promise<string> {
-  const features = await client.findFeatures(params) as any[];
-  if (!features || features.length === 0) return 'No features found.';
+  try {
+    const features = await client.findFeatures(params) as any[];
+    if (!features || features.length === 0) return 'No features found.';
 
-  const rows = features.map((f: any) => [
-    f.display_id ?? f.id.slice(0, 8),
-    stateSymbol(f.state),
-    String(f.priority),
-    f.title,
-  ]);
-  return markdownTable(['ID', 'State', 'P', 'Title'], rows);
+    const rows = features.map((f: any) => [
+      f.display_id ?? f.id.slice(0, 8),
+      stateSymbol(f.state),
+      String(f.priority),
+      f.title,
+    ]);
+    return markdownTable(['ID', 'State', 'P', 'Title'], rows);
+  } catch (err) {
+    return handleError(err);
+  }
 }
 
 // ============================================================
@@ -72,6 +92,7 @@ export async function handleGetFeature(
   client: ManifestClient,
   params: GetFeatureParams,
 ): Promise<string> {
+  try {
   const ctx = await client.getFeatureContext(params.feature_id);
   const parts: string[] = [];
 
@@ -141,6 +162,9 @@ export async function handleGetFeature(
   }
 
   return parts.join('\n');
+  } catch (err) {
+    return handleError(err);
+  }
 }
 
 // ============================================================
@@ -148,16 +172,23 @@ export async function handleGetFeature(
 // ============================================================
 
 interface GetActiveFeatureParams {
-  project_id: string;
+  project_id?: string;
+  directory_path?: string;
 }
 
 export async function handleGetActiveFeature(
   client: ManifestClient,
   params: GetActiveFeatureParams,
 ): Promise<string> {
-  const result = await client.getActiveFeature(params.project_id) as any;
-  if (!result || !result.id) return 'No feature is currently selected in the Manifest app.';
-  return formatResponse(result);
+  try {
+    const projectId = await resolveProjectId(client, params);
+    if (!projectId) return 'No project found. Pass project_id or directory_path.';
+    const result = await client.getActiveFeature(projectId) as any;
+    if (!result || !result.id) return 'No feature is currently selected in the Manifest app.';
+    return formatFeatureSummary(result);
+  } catch (err) {
+    return handleError(err);
+  }
 }
 
 // ============================================================
@@ -165,7 +196,8 @@ export async function handleGetActiveFeature(
 // ============================================================
 
 interface GetNextFeatureParams {
-  project_id: string;
+  project_id?: string;
+  directory_path?: string;
   version_id?: string;
 }
 
@@ -173,9 +205,40 @@ export async function handleGetNextFeature(
   client: ManifestClient,
   params: GetNextFeatureParams,
 ): Promise<string> {
-  const result = await client.getNextFeature(params.project_id, params.version_id) as any;
-  if (!result || !result.id) return 'No workable features found.';
-  return formatResponse(result);
+  try {
+    const projectId = await resolveProjectId(client, params);
+    if (!projectId) return 'No project found. Pass project_id or directory_path.';
+    const result = await client.getNextFeature(projectId, params.version_id) as any;
+    if (!result || !result.id) return 'No workable features found.';
+    return formatFeatureSummary(result);
+  } catch (err) {
+    if (err instanceof ConflictError) {
+      return formatStaleFeatures(err.body);
+    }
+    return handleError(err);
+  }
+}
+
+function formatStaleFeatures(body: string): string {
+  try {
+    let data = JSON.parse(body);
+    // Handle double-encoded JSON (older server versions)
+    if (typeof data.error === 'string' && data.error.startsWith('{')) {
+      data = JSON.parse(data.error);
+    }
+    const features = data.features ?? [];
+    const parts: string[] = [];
+    parts.push(`## ${features.length} feature(s) still in progress\n`);
+    parts.push('Complete or release these before starting new work:\n');
+    for (const f of features) {
+      const id = f.display_id ?? f.id?.slice(0, 8);
+      parts.push(`- ${id} ${f.title} (${f.state})`);
+    }
+    parts.push('\nUse manifest_complete_feature to finish them, or manifest_update_feature to archive if abandoned.');
+    return parts.join('\n');
+  } catch {
+    return body;
+  }
 }
 
 // ============================================================
@@ -183,28 +246,209 @@ export async function handleGetNextFeature(
 // ============================================================
 
 interface RenderFeatureTreeParams {
-  project_id: string;
+  project_id?: string;
+  directory_path?: string;
   max_depth?: number;
+  state?: string;
 }
 
 export async function handleRenderFeatureTree(
   client: ManifestClient,
   params: RenderFeatureTreeParams,
 ): Promise<string> {
-  const tree = await client.getFeatureTree(params.project_id);
-  if (!tree || tree.length === 0) return 'No features found.';
+  try {
+    const projectId = await resolveProjectId(client, params);
+    if (!projectId) return 'No project found. Pass project_id or directory_path.';
+    let tree = await client.getFeatureTree(projectId);
+    if (!tree || tree.length === 0) return 'No features found.';
 
-  // Try to get key_prefix from the project — best effort
-  const keyPrefix = ''; // Will be resolved by the tool registration layer
-  const output = renderTree(tree, params.max_depth ?? 0, keyPrefix);
-  return output;
+    // Filter by state if requested (keeps parent structure for context)
+    if (params.state) {
+      const targetState = params.state;
+      tree = filterTree(tree, (node) => node.state === targetState);
+      if (tree.length === 0) return `No ${targetState} features found.`;
+    }
+
+    // Fetch project to get key_prefix for display IDs
+    let keyPrefix = '';
+    try {
+      const project = await client.getProject(projectId);
+      keyPrefix = project.key_prefix ?? '';
+    } catch {
+      // Best effort — render without display IDs
+    }
+
+    return renderTree(tree, params.max_depth ?? 0, keyPrefix);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+// ============================================================
+// orient
+// ============================================================
+
+interface OrientParams {
+  project_id?: string;
+  directory_path?: string;
+}
+
+export async function handleOrient(
+  client: ManifestClient,
+  params: OrientParams,
+): Promise<string> {
+  try {
+    // Resolve project
+    let projectId = params.project_id;
+    let projectName = '';
+    if (!projectId && params.directory_path) {
+      const resp = await client.listProjectsByDirectory(params.directory_path) as any;
+      const project = resp?.project ?? resp;
+      if (project?.id) {
+        projectId = project.id;
+        projectName = project.name;
+      }
+    }
+    if (!projectId) return 'No project found. Use manifest_init_project to create one.';
+
+    // Parallel fetch
+    const [tree, active, proposed, history] = await Promise.all([
+      client.getFeatureTree(projectId).catch(() => []),
+      client.getActiveFeature(projectId).catch(() => null),
+      client.findFeatures({ project_id: projectId, state: 'proposed', limit: 3 }).catch(() => []),
+      client.getProjectHistory(projectId, { limit: 5 }).catch(() => []),
+    ]);
+
+    const parts: string[] = [];
+
+    // Project header
+    if (projectName) {
+      parts.push(`# ${projectName}`);
+    }
+    parts.push(`Project: ${projectId}`);
+
+    // Tree (max depth 2 for overview)
+    if (Array.isArray(tree) && tree.length > 0) {
+      let keyPrefix = '';
+      try {
+        const project = await client.getProject(projectId);
+        keyPrefix = project.key_prefix ?? '';
+      } catch {
+        // best effort
+      }
+      parts.push('');
+      parts.push('## Feature Tree');
+      parts.push(renderTree(tree, 2, keyPrefix));
+    }
+
+    // Active feature
+    const activeAny = active as any;
+    if (activeAny?.id) {
+      parts.push('## Active Feature');
+      parts.push(`${stateSymbol(activeAny.state)} ${activeAny.title} (${activeAny.state})`);
+      if (activeAny.display_id) parts.push(`  ID: ${activeAny.display_id}`);
+    }
+
+    // Work queue
+    const proposedArr = proposed as any[];
+    if (Array.isArray(proposedArr) && proposedArr.length > 0) {
+      parts.push('');
+      parts.push('## Next Up');
+      for (const f of proposedArr) {
+        parts.push(`  ${stateSymbol(f.state)} ${f.title}`);
+      }
+    }
+
+    // Recent history
+    const historyArr = history as any[];
+    if (Array.isArray(historyArr) && historyArr.length > 0) {
+      parts.push('');
+      parts.push('## Recent Activity');
+      for (const entry of historyArr) {
+        const headline = (entry.summary ?? '').split('\n')[0].trim();
+        parts.push(`  ${stateSymbol(entry.feature_state)} ${entry.feature_title} -- ${headline}`);
+      }
+    }
+
+    return parts.join('\n');
+  } catch (err) {
+    return handleError(err);
+  }
 }
 
 // ============================================================
 // Helpers
 // ============================================================
 
+/** Resolve project_id from either direct ID or directory_path auto-discovery. */
+async function resolveProjectId(
+  client: ManifestClient,
+  params: { project_id?: string; directory_path?: string },
+): Promise<string | null> {
+  if (params.project_id) return params.project_id;
+  if (!params.directory_path) return null;
+  const resp = await client.listProjectsByDirectory(params.directory_path) as any;
+  const project = resp?.project ?? resp;
+  return project?.id ?? null;
+}
+
+function handleError(err: unknown): string {
+  if (err instanceof ConnectionError) {
+    return 'Cannot connect to Manifest server. Is it running? Start with: manifest serve';
+  }
+  if (err instanceof ApiError) {
+    return `Error (${err.status}): ${err.body}`;
+  }
+  throw err;
+}
+
 function formatResponse(data: unknown): string {
   if (typeof data === 'string') return data;
   return JSON.stringify(data, null, 2);
+}
+
+/** Format a feature response (from get_next, get_active, etc.) as structured text. */
+function formatFeatureSummary(feature: any): string {
+  const parts: string[] = [];
+
+  // Header
+  const displayId = feature.display_id
+    ?? (feature.feature_number != null ? `#${feature.feature_number}` : feature.id?.slice(0, 8));
+  parts.push(`Feature: ${displayId} ${feature.title} (${feature.state})`);
+  parts.push(`ID: ${feature.id}`);
+  parts.push(`Priority: ${feature.priority}`);
+  if (feature.parent) parts.push(`Parent: ${feature.parent.title}`);
+
+  // Breadcrumb path
+  if (feature.breadcrumb?.length > 0) {
+    const path = feature.breadcrumb.map((b: any) => b.title).join(' > ');
+    parts.push(`Path: ${path}`);
+  }
+
+  // Details
+  if (feature.details) {
+    parts.push('');
+    parts.push('## Details');
+    parts.push(feature.details);
+  }
+
+  // Children
+  if (feature.children?.length > 0) {
+    parts.push('');
+    parts.push('## Children');
+    for (const child of feature.children) {
+      parts.push(`  ${stateSymbol(child.state)} ${child.title}`);
+    }
+  }
+
+  // Siblings
+  if (feature.siblings?.length > 0) {
+    parts.push('');
+    parts.push('## Siblings');
+    for (const sib of feature.siblings) {
+      parts.push(`  ${stateSymbol(sib.state)} ${sib.title}`);
+    }
+  }
+
+  return parts.join('\n');
 }

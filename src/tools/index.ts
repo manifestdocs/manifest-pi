@@ -5,6 +5,8 @@
  */
 
 import { Type } from '@sinclair/typebox';
+import { StringEnum } from '@mariozechner/pi-ai';
+import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import type { ManifestClient } from '../client.js';
 import {
   handleListProjects,
@@ -13,6 +15,7 @@ import {
   handleGetActiveFeature,
   handleGetNextFeature,
   handleRenderFeatureTree,
+  handleOrient,
 } from './discovery.js';
 import {
   handleStartFeature,
@@ -28,6 +31,8 @@ import {
   handlePlan,
   handleGetProjectInstructions,
   handleGetProjectHistory,
+  handleGenerateFeatureTree,
+  handleSync,
 } from './setup.js';
 import {
   handleListVersions,
@@ -49,6 +54,7 @@ export {
   handleGetActiveFeature,
   handleGetNextFeature,
   handleRenderFeatureTree,
+  handleOrient,
   handleStartFeature,
   handleUpdateFeature,
   handleProveFeature,
@@ -60,6 +66,8 @@ export {
   handlePlan,
   handleGetProjectInstructions,
   handleGetProjectHistory,
+  handleGenerateFeatureTree,
+  handleSync,
   handleListVersions,
   handleCreateVersion,
   handleSetFeatureVersion,
@@ -72,7 +80,7 @@ export {
 /**
  * Register all Manifest tools with Pi.
  */
-export function registerAllTools(pi: any, client: ManifestClient): void {
+export function registerAllTools(pi: ExtensionAPI, client: ManifestClient): void {
   registerDiscoveryTools(pi, client);
   registerWorkTools(pi, client);
   registerSetupTools(pi, client);
@@ -81,18 +89,18 @@ export function registerAllTools(pi: any, client: ManifestClient): void {
 }
 
 function toolResult(text: string) {
-  return { content: [{ type: 'text' as const, text }] };
+  return { content: [{ type: 'text' as const, text }], details: undefined };
 }
 
 // ============================================================
 // Discovery Tools
 // ============================================================
 
-function registerDiscoveryTools(pi: any, client: ManifestClient): void {
+function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_list_projects',
     description: 'List projects. If directory_path is provided, finds the project containing that directory.',
-    promptSnippet: 'List Manifest projects (auto-detect from directory)',
+    label: 'List Manifest projects (auto-detect from directory)',
     parameters: Type.Object({
       directory_path: Type.Optional(Type.String({
         description: 'Directory path to find the project for (auto-discovery)',
@@ -107,11 +115,11 @@ function registerDiscoveryTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_find_features',
     description: 'Find features by project, state, or search query. Returns summaries only.',
-    promptSnippet: 'Search Manifest features by query, state, or project',
+    label: 'Search Manifest features by query, state, or project',
     parameters: Type.Object({
       project_id: Type.Optional(Type.String({ description: 'Project UUID to filter by' })),
       version_id: Type.Optional(Type.String({ description: 'Version UUID to filter by' })),
-      state: Type.Optional(Type.String({ description: "State filter: 'proposed', 'in_progress', 'implemented', 'archived'" })),
+      state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "State filter" })),
       query: Type.Optional(Type.String({ description: 'Search query for title and details' })),
       limit: Type.Optional(Type.Number({ description: 'Max results to return' })),
       offset: Type.Optional(Type.Number({ description: 'Number to skip for pagination' })),
@@ -125,11 +133,11 @@ function registerDiscoveryTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_get_feature',
     description: 'Get detailed feature spec with hierarchical context. Returns breadcrumb with ancestor context.',
-    promptSnippet: 'Get full Manifest feature details with context',
+    label: 'Get full Manifest feature details with context',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID (e.g., MAN-42)' }),
       include_history: Type.Optional(Type.Boolean({ description: 'Include implementation history. Default false.' })),
-      depth: Type.Optional(Type.String({ description: "Context depth: 'shallow', 'standard', or 'deep'" })),
+      depth: Type.Optional(StringEnum(["shallow", "standard", "deep"] as const, { description: "Context depth" })),
     }),
     async execute(_id: string, params: any) {
       const text = await handleGetFeature(client, params);
@@ -140,9 +148,10 @@ function registerDiscoveryTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_get_active_feature',
     description: 'Get the feature currently selected in the Manifest app. Call this first when the user says "this feature" or "work on this".',
-    promptSnippet: 'Get the active/selected feature from Manifest UI',
+    label: 'Get the active/selected feature from Manifest UI',
     parameters: Type.Object({
-      project_id: Type.String({ description: 'Project UUID' }),
+      project_id: Type.Optional(Type.String({ description: 'Project UUID' })),
+      directory_path: Type.Optional(Type.String({ description: 'Directory path for auto-discovery (alternative to project_id)' })),
     }),
     async execute(_id: string, params: any) {
       const text = await handleGetActiveFeature(client, params);
@@ -153,9 +162,10 @@ function registerDiscoveryTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_get_next_feature',
     description: 'Get the highest-priority workable feature. Use ONLY when the user says "next feature" or "what\'s next".',
-    promptSnippet: 'Get next priority feature to work on',
+    label: 'Get next priority feature to work on',
     parameters: Type.Object({
-      project_id: Type.String({ description: 'Project UUID' }),
+      project_id: Type.Optional(Type.String({ description: 'Project UUID' })),
+      directory_path: Type.Optional(Type.String({ description: 'Directory path for auto-discovery (alternative to project_id)' })),
       version_id: Type.Optional(Type.String({ description: 'Optional version UUID to filter by' })),
     }),
     async execute(_id: string, params: any) {
@@ -166,14 +176,30 @@ function registerDiscoveryTools(pi: any, client: ManifestClient): void {
 
   pi.registerTool({
     name: 'manifest_render_feature_tree',
-    description: 'Render the feature tree as ASCII art with state symbols.',
-    promptSnippet: 'Display Manifest feature tree hierarchy',
+    description: 'Render the feature tree as ASCII art with state symbols. Optionally filter by leaf state.',
+    label: 'Display Manifest feature tree hierarchy',
     parameters: Type.Object({
-      project_id: Type.String({ description: 'Project UUID' }),
+      project_id: Type.Optional(Type.String({ description: 'Project UUID' })),
+      directory_path: Type.Optional(Type.String({ description: 'Directory path for auto-discovery (alternative to project_id)' })),
       max_depth: Type.Optional(Type.Number({ description: 'Max depth (0 = unlimited). Default 0.' })),
+      state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "Filter tree to branches containing leaves in this state" })),
     }),
     async execute(_id: string, params: any) {
       const text = await handleRenderFeatureTree(client, params);
+      return toolResult(text);
+    },
+  });
+
+  pi.registerTool({
+    name: 'manifest_orient',
+    description: 'Session bootloader. Returns project overview: feature tree (depth 2), active feature, work queue, recent activity. Call at session start.',
+    label: 'Get full project orientation (tree, active, queue, history)',
+    parameters: Type.Object({
+      project_id: Type.Optional(Type.String({ description: 'Project UUID (optional if directory_path provided)' })),
+      directory_path: Type.Optional(Type.String({ description: 'Directory path to auto-discover project' })),
+    }),
+    async execute(_id: string, params: any) {
+      const text = await handleOrient(client, params);
       return toolResult(text);
     },
   });
@@ -183,19 +209,14 @@ function registerDiscoveryTools(pi: any, client: ManifestClient): void {
 // Work Tools
 // ============================================================
 
-function registerWorkTools(pi: any, client: ManifestClient): void {
+function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_start_feature',
     description: 'Start work on a feature. Transitions to in_progress and records your claim. MUST be called before implementing.',
-    promptSnippet: 'Claim and start working on a Manifest feature',
-    promptGuidelines: [
-      'ALWAYS call manifest_start_feature before implementing a feature.',
-      'After starting, follow the spec returned -- it is your implementation contract.',
-      'Call manifest_prove_feature with test results, then manifest_complete_feature when done.',
-    ],
+    label: 'Claim and start working on a Manifest feature',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
-      agent_type: Type.Optional(Type.String({ description: "Agent type. Defaults to 'pi'." })),
+      agent_type: Type.Optional(StringEnum(["claude", "gemini", "codex", "pi", "copilot"] as const, { description: "Agent type. Defaults to 'pi'." })),
       force: Type.Optional(Type.Boolean({ description: 'Force start even if claimed. Default false.' })),
       claim_metadata: Type.Optional(Type.String({ description: 'JSON metadata (branch, worktree, etc.)' })),
     }),
@@ -208,14 +229,14 @@ function registerWorkTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_update_feature',
     description: 'Update any feature field: title, details, state, priority, parent, version.',
-    promptSnippet: 'Update a Manifest feature (details, state, priority, etc.)',
+    label: 'Update a Manifest feature (details, state, priority, etc.)',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
       title: Type.Optional(Type.String({ description: 'New title' })),
       details: Type.Optional(Type.String({ description: 'New details/spec' })),
       desired_details: Type.Optional(Type.String({ description: 'Proposed changes for human review' })),
       details_summary: Type.Optional(Type.String({ description: 'Short summary for root features' })),
-      state: Type.Optional(Type.String({ description: "New state: 'proposed', 'blocked', 'in_progress', 'archived'" })),
+      state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "archived"] as const, { description: "New state" })),
       priority: Type.Optional(Type.Number({ description: 'Priority (lower = first)' })),
       parent_id: Type.Optional(Type.String({ description: 'Move to different parent UUID' })),
       target_version_id: Type.Optional(Type.String({ description: 'Assign to version UUID' })),
@@ -231,7 +252,7 @@ function registerWorkTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_prove_feature',
     description: 'Record test evidence for a feature. Creates a proof with command, exit code, and structured results.',
-    promptSnippet: 'Record test proof for a Manifest feature',
+    label: 'Record test proof for a Manifest feature',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
       command: Type.String({ description: "Test command run (e.g., 'vitest run')" }),
@@ -242,7 +263,7 @@ function registerWorkTools(pi: any, client: ManifestClient): void {
         file: Type.Optional(Type.String({ description: 'Source file path' })),
         tests: Type.Array(Type.Object({
           name: Type.String({ description: 'Test name' }),
-          state: Type.String({ description: "'passed', 'failed', 'errored', 'skipped'" }),
+          state: StringEnum(["passed", "failed", "errored", "skipped"] as const, { description: "Test result state" }),
           file: Type.Optional(Type.String()),
           line: Type.Optional(Type.Number()),
           duration_ms: Type.Optional(Type.Number()),
@@ -264,12 +285,7 @@ function registerWorkTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_complete_feature',
     description: 'Mark work as done. Records history with summary and commits, sets state to implemented.',
-    promptSnippet: 'Complete a Manifest feature with summary and commits',
-    promptGuidelines: [
-      'ALWAYS call manifest_prove_feature before manifest_complete_feature.',
-      'ALWAYS call manifest_update_feature to update the spec before completing.',
-      'Include key decisions and rationale in the summary.',
-    ],
+    label: 'Complete a Manifest feature with summary and commits',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
       summary: Type.String({ description: 'Work summary. First line = headline.' }),
@@ -290,11 +306,11 @@ function registerWorkTools(pi: any, client: ManifestClient): void {
 // Setup Tools
 // ============================================================
 
-function registerSetupTools(pi: any, client: ManifestClient): void {
+function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_init_project',
     description: 'Initialize a project from a directory. Analyzes codebase, creates project, returns size signals.',
-    promptSnippet: 'Initialize a Manifest project from a directory',
+    label: 'Initialize a Manifest project from a directory',
     parameters: Type.Object({
       directory_path: Type.String({ description: 'Absolute path to the project directory' }),
       skip_default_versions: Type.Optional(Type.Boolean({ description: 'Skip creating default versions. Default false.' })),
@@ -308,7 +324,7 @@ function registerSetupTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_add_project_directory',
     description: 'Associate an additional directory with a project (monorepo support).',
-    promptSnippet: 'Add a directory to a Manifest project',
+    label: 'Add a directory to a Manifest project',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
       path: Type.String({ description: 'Absolute directory path' }),
@@ -325,13 +341,13 @@ function registerSetupTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_create_feature',
     description: 'Create a single feature. Check find_features for duplicates first.',
-    promptSnippet: 'Create a new Manifest feature',
+    label: 'Create a new Manifest feature',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
       parent_id: Type.Optional(Type.String({ description: 'Parent feature UUID' })),
       title: Type.String({ description: 'Short capability name (2-5 words)' }),
       details: Type.Optional(Type.String({ description: 'Feature spec or shared context' })),
-      state: Type.Optional(Type.String({ description: "Initial state. Default 'proposed'." })),
+      state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "Initial state. Default 'proposed'." })),
       priority: Type.Optional(Type.Number({ description: 'Priority (lower = first). Default 0.' })),
     }),
     async execute(_id: string, params: any) {
@@ -343,7 +359,7 @@ function registerSetupTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_delete_feature',
     description: 'Permanently delete a feature and descendants. Use only for archived features.',
-    promptSnippet: 'Delete an archived Manifest feature',
+    label: 'Delete an archived Manifest feature',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID' }),
     }),
@@ -356,14 +372,14 @@ function registerSetupTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_plan',
     description: 'Decompose a PRD or vision into a feature tree. Use confirm=false to preview, confirm=true to create.',
-    promptSnippet: 'Plan and create a Manifest feature tree',
+    label: 'Plan and create a Manifest feature tree',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
       features: Type.Array(Type.Recursive((Self) => Type.Object({
         title: Type.String({ description: 'Feature capability name' }),
         details: Type.Optional(Type.String({ description: 'Spec or shared context' })),
         priority: Type.Number({ description: 'Priority (lower = first)' }),
-        state: Type.Optional(Type.String({ description: "Initial state. Default 'proposed'." })),
+        state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "Initial state. Default 'proposed'." })),
         children: Type.Array(Self),
       })), { description: 'Proposed feature tree' }),
       confirm: Type.Boolean({ description: 'true to create, false to preview' }),
@@ -378,7 +394,7 @@ function registerSetupTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_get_project_instructions',
     description: 'Get full project instructions (coding guidelines, conventions).',
-    promptSnippet: 'Get Manifest project instructions',
+    label: 'Get Manifest project instructions',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
     }),
@@ -391,7 +407,7 @@ function registerSetupTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_get_project_history',
     description: 'Get recent activity timeline. Display directly without reformatting.',
-    promptSnippet: 'Get Manifest project activity history',
+    label: 'Get Manifest project activity history',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
       feature_id: Type.Optional(Type.String({ description: 'Filter to feature and descendants' })),
@@ -402,17 +418,43 @@ function registerSetupTools(pi: any, client: ManifestClient): void {
       return toolResult(text);
     },
   });
+
+  pi.registerTool({
+    name: 'manifest_generate_feature_tree',
+    description: 'Analyze a codebase directory and generate a proposed feature tree from its structure.',
+    label: 'Generate Manifest feature tree from codebase analysis',
+    parameters: Type.Object({
+      directory_path: Type.String({ description: 'Absolute path to the project directory to analyze' }),
+    }),
+    async execute(_id: string, params: any) {
+      const text = await handleGenerateFeatureTree(client, params);
+      return toolResult(text);
+    },
+  });
+
+  pi.registerTool({
+    name: 'manifest_sync',
+    description: 'Reconcile the feature tree with git history. Returns sync proposals.',
+    label: 'Sync Manifest features with git history',
+    parameters: Type.Object({
+      project_id: Type.String({ description: 'Project UUID' }),
+    }),
+    async execute(_id: string, params: any) {
+      const text = await handleSync(client, params);
+      return toolResult(text);
+    },
+  });
 }
 
 // ============================================================
 // Version Tools
 // ============================================================
 
-function registerVersionTools(pi: any, client: ManifestClient): void {
+function registerVersionTools(pi: ExtensionAPI, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_list_versions',
     description: 'List versions with status indicators (next, planned, released).',
-    promptSnippet: 'List Manifest version roadmap',
+    label: 'List Manifest version roadmap',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
     }),
@@ -425,7 +467,7 @@ function registerVersionTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_create_version',
     description: 'Create a release milestone. Name must be semantic version (e.g., 0.2.0).',
-    promptSnippet: 'Create a Manifest version milestone',
+    label: 'Create a Manifest version milestone',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
       name: Type.String({ description: "Version name (e.g., '0.2.0')" }),
@@ -440,7 +482,7 @@ function registerVersionTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_set_feature_version',
     description: 'Assign a feature to a version. Pass null to unassign.',
-    promptSnippet: 'Assign a Manifest feature to a version',
+    label: 'Assign a Manifest feature to a version',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID' }),
       version_id: Type.Union([Type.String(), Type.Null()], { description: 'Version UUID or null to unassign' }),
@@ -454,7 +496,7 @@ function registerVersionTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_release_version',
     description: 'Mark a version as shipped.',
-    promptSnippet: 'Release a Manifest version',
+    label: 'Release a Manifest version',
     parameters: Type.Object({
       version_id: Type.String({ description: 'Version UUID' }),
     }),
@@ -469,11 +511,11 @@ function registerVersionTools(pi: any, client: ManifestClient): void {
 // Verification Tools
 // ============================================================
 
-function registerVerificationTools(pi: any, client: ManifestClient): void {
+function registerVerificationTools(pi: ExtensionAPI, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_verify_feature',
     description: 'Assemble spec + diff for checking implementation against spec. You are the LLM.',
-    promptSnippet: 'Verify a Manifest feature implementation against spec',
+    label: 'Verify a Manifest feature implementation against spec',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
       commit_range: Type.Optional(Type.String({ description: "Git commit range (e.g., 'abc123..HEAD')" })),
@@ -487,11 +529,11 @@ function registerVerificationTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_record_verification',
     description: 'Store verification comments. Pass empty array if implementation satisfies spec.',
-    promptSnippet: 'Record verification results for a Manifest feature',
+    label: 'Record verification results for a Manifest feature',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
       comments: Type.Array(Type.Object({
-        severity: Type.String({ description: "'critical', 'major', or 'minor'" }),
+        severity: StringEnum(["critical", "major", "minor"] as const, { description: "Comment severity" }),
         title: Type.String({ description: 'One-line summary of the gap' }),
         body: Type.String({ description: 'Actionable explanation' }),
         file: Type.Optional(Type.String({ description: 'Affected file path' })),
@@ -506,7 +548,7 @@ function registerVerificationTools(pi: any, client: ManifestClient): void {
   pi.registerTool({
     name: 'manifest_get_feature_proof',
     description: 'Get latest proof and verification status for a feature.',
-    promptSnippet: 'Get test proof for a Manifest feature',
+    label: 'Get test proof for a Manifest feature',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
     }),

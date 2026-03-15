@@ -113,8 +113,7 @@ export interface UpdateFeatureInput {
   blocked_by?: string[];
 }
 
-export interface FeatureTreeNode {
-  feature: Feature;
+export interface FeatureTreeNode extends Feature {
   children: FeatureTreeNode[];
   is_root?: boolean;
 }

@@ -12,6 +12,9 @@ importers:
         specifier: ^0.53.0
         version: 0.53.1(ws@8.19.0)(zod@3.25.76)
     devDependencies:
+      '@mariozechner/pi-ai':
+        specifier: '*'
+        version: 0.53.1(ws@8.19.0)(zod@3.25.76)
       '@sinclair/typebox':
         specifier: ^0.34.0
         version: 0.34.48

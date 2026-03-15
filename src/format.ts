@@ -57,6 +57,29 @@ export function displayId(
 // Tree Rendering
 // ============================================================
 
+/**
+ * Filter a tree to only include branches containing leaves that match the predicate.
+ * Parent nodes are retained as structural context when they have matching descendants.
+ */
+export function filterTree(
+  nodes: FeatureTreeNode[],
+  predicate: (node: FeatureTreeNode) => boolean,
+): FeatureTreeNode[] {
+  const result: FeatureTreeNode[] = [];
+  for (const node of nodes) {
+    const isLeaf = node.children.length === 0;
+    if (isLeaf) {
+      if (predicate(node)) result.push(node);
+    } else {
+      const filteredChildren = filterTree(node.children, predicate);
+      if (filteredChildren.length > 0) {
+        result.push({ ...node, children: filteredChildren });
+      }
+    }
+  }
+  return result;
+}
+
 export function renderTree(
   nodes: FeatureTreeNode[],
   maxDepth: number,
@@ -81,21 +104,24 @@ function renderNode(
 ): string {
   let output = '';
 
+  const isLeaf = node.children.length === 0;
   const symbol = node.is_root
     ? PROJECT_ROOT
-    : stateSymbol(node.feature.state);
+    : isLeaf ? stateSymbol(node.state) : '';
 
   // Format display ID
   let idLabel = '';
-  if (keyPrefix && node.feature.feature_number != null) {
-    idLabel = `${keyPrefix}-${node.feature.feature_number} `;
+  if (keyPrefix && node.feature_number != null) {
+    idLabel = `${keyPrefix}-${node.feature_number} `;
   }
 
+  const label = symbol ? `${symbol} ${idLabel}${node.title}` : `${idLabel}${node.title}`;
+
   if (isTreeRoot) {
-    output += `${symbol} ${idLabel}${node.feature.title}\n`;
+    output += `${label}\n`;
   } else {
     const branch = isLast ? '\u2514\u2500\u2500 ' : '\u251c\u2500\u2500 ';
-    output += `${prefix}${branch}${idLabel}${symbol} ${node.feature.title}\n`;
+    output += `${prefix}${branch}${label}\n`;
   }
 
   const childPrefix = isTreeRoot

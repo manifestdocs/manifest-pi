@@ -4,16 +4,29 @@
   "description": "Manifest integration for Pi coding agent — feature-driven development tools",
   "type": "module",
   "license": "MIT",
-  "keywords": ["pi-package", "manifest", "feature-management", "coding-agent"],
+  "keywords": [
+    "pi-package",
+    "manifest",
+    "feature-management",
+    "coding-agent"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/manifestdocs/manifest-pi.git"
   },
   "pi": {
-    "extensions": ["extensions/manifest.ts"],
-    "skills": ["skills/*.md"],
-    "prompts": ["prompts/manifest.md"],
-    "agents": ["agents/product-engineer.md"]
+    "extensions": [
+      "extensions/manifest.ts"
+    ],
+    "skills": [
+      "skills/*.md"
+    ],
+    "prompts": [
+      "prompts/manifest.md"
+    ],
+    "agents": [
+      "agents/*.md"
+    ]
   },
   "scripts": {
     "build": "tsc",
@@ -22,12 +35,15 @@
     "check": "tsc --noEmit"
   },
   "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "^0.53.0",
     "@sinclair/typebox": "*"
   },
   "devDependencies": {
+    "@mariozechner/pi-ai": "*",
     "@sinclair/typebox": "^0.34.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
-  }
+  },
+  "dependencies": {}
 }

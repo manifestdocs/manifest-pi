@@ -25,8 +25,8 @@ export async function handleStartFeature(
       agent_type: params.agent_type ?? 'pi',
       force: params.force ?? false,
       claim_metadata: params.claim_metadata,
-    });
-    return formatResponse(result);
+    }) as any;
+    return formatStartResult(result);
   } catch (err) {
     if (err instanceof ConflictError) {
       return `Error: ${err.body}`;
@@ -36,6 +36,56 @@ export async function handleStartFeature(
     }
     throw err;
   }
+}
+
+function formatStartResult(result: any): string {
+  if (!result || typeof result !== 'object') return 'Feature started.';
+
+  const parts: string[] = [];
+
+  // Header
+  const displayId = result.display_id ?? result.id?.slice(0, 8) ?? '';
+  parts.push(`Started: ${displayId} ${result.title ?? ''} (${result.state ?? 'in_progress'})`);
+  if (result.feature_tier) parts.push(`Tier: ${result.feature_tier}`);
+
+  // Spec status
+  if (result.spec_status) parts.push(`Spec: ${result.spec_status}`);
+
+  // Breadcrumb
+  if (result.breadcrumb?.length > 0) {
+    const path = result.breadcrumb.map((b: any) => b.title).join(' > ');
+    parts.push(`Path: ${path}`);
+  }
+
+  // Details (the spec to implement against)
+  if (result.details) {
+    parts.push('');
+    parts.push('## Specification');
+    parts.push(result.details);
+  }
+
+  // Desired details (change request)
+  if (result.desired_details) {
+    parts.push('');
+    parts.push('## Requested Changes');
+    parts.push(result.desired_details);
+  }
+
+  // Spec guidance
+  if (result.spec_guidance) {
+    parts.push('');
+    parts.push('## Spec Guidance');
+    parts.push(result.spec_guidance);
+  }
+
+  // Testing guidance
+  if (result.testing_guidance) {
+    parts.push('');
+    parts.push('## Testing');
+    parts.push(result.testing_guidance);
+  }
+
+  return parts.join('\n');
 }
 
 // ============================================================

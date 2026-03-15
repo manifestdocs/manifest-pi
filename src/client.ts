@@ -154,7 +154,7 @@ export class ManifestClient {
 
   async listProjectsByDirectory(directoryPath: string): Promise<unknown> {
     const encoded = encodeURIComponent(directoryPath);
-    return this.request('GET', `/projects?directory_path=${encoded}`);
+    return this.request('GET', `/projects/by-directory?path=${encoded}`);
   }
 
   async getProject(id: string): Promise<ProjectWithDirectories> {
@@ -316,6 +316,18 @@ export class ManifestClient {
     },
   ): Promise<unknown> {
     return this.request('POST', `/projects/${projectId}/features/plan`, input);
+  }
+
+  // ============================================================
+  // Analysis & Sync
+  // ============================================================
+
+  async analyzeCodebase(directoryPath: string): Promise<unknown> {
+    return this.request('GET', `/codebase/analyze?directory_path=${encodeURIComponent(directoryPath)}`);
+  }
+
+  async syncFeatures(projectId: string): Promise<unknown> {
+    return this.request('POST', `/projects/${projectId}/sync`);
   }
 
   // ============================================================

@@ -3,6 +3,7 @@ import {
   stateSymbol,
   displayId,
   renderTree,
+  filterTree,
   markdownTable,
   timeBucket,
   lodBreadcrumb,
@@ -80,27 +81,25 @@ describe('format', () => {
       opts?: { feature_number?: number; is_root?: boolean },
     ): FeatureTreeNode {
       return {
-        feature: {
-          id: '00000000-0000-0000-0000-000000000000',
-          project_id: '00000000-0000-0000-0000-000000000001',
-          title,
-          state: state as any,
-          priority: 0,
-          feature_number: opts?.feature_number ?? null,
-          created_at: '',
-          updated_at: '',
-        },
+        id: '00000000-0000-0000-0000-000000000000',
+        project_id: '00000000-0000-0000-0000-000000000001',
+        title,
+        state: state as any,
+        priority: 0,
+        feature_number: opts?.feature_number ?? null,
+        created_at: '',
+        updated_at: '',
         children,
         is_root: opts?.is_root,
       };
     }
 
-    it('renders single root node', () => {
+    it('renders single leaf root node with state symbol', () => {
       const tree = [makeNode('Authentication', 'proposed')];
       expect(renderTree(tree, 0, '')).toBe('\u25c7 Authentication\n');
     });
 
-    it('renders nested children with box-drawing chars', () => {
+    it('renders nested children — only leaves show state', () => {
       const tree = [
         makeNode('Auth', 'proposed', [
           makeNode('Password Login', 'implemented'),
@@ -108,12 +107,15 @@ describe('format', () => {
         ]),
       ];
       const output = renderTree(tree, 0, '');
-      expect(output).toContain('\u25c7 Auth');
+      // Parent node has no state symbol
+      expect(output).toContain('Auth\n');
+      expect(output).not.toContain('\u25c7 Auth');
+      // Leaf children show state
       expect(output).toContain('\u251c\u2500\u2500 \u25cf Password Login');
       expect(output).toContain('\u2514\u2500\u2500 \u25cb OAuth');
     });
 
-    it('shows state symbols', () => {
+    it('shows state symbols only on leaf nodes', () => {
       const tree = [makeNode('Root', 'proposed', [
         makeNode('A', 'implemented'),
         makeNode('B', 'blocked'),
@@ -123,6 +125,8 @@ describe('format', () => {
       expect(output).toContain('\u25cf A');
       expect(output).toContain('\u2298 B');
       expect(output).toContain('\u2717 C');
+      // Root (parent) has no state symbol
+      expect(output).not.toContain('\u25c7 Root');
     });
 
     it('respects maxDepth', () => {
@@ -148,14 +152,81 @@ describe('format', () => {
       ];
       const output = renderTree(tree, 0, 'MAN');
       expect(output).toContain('MAN-1 Auth');
-      expect(output).toContain('MAN-2 \u25cf Login');
-      expect(output).toContain('MAN-3 \u25cb OAuth');
+      expect(output).toContain('\u25cf MAN-2 Login');  // leaf — symbol before ID
+      expect(output).toContain('\u25cb MAN-3 OAuth');  // leaf — symbol before ID
     });
 
     it('shows project root symbol', () => {
       const tree = [makeNode('My Project', 'proposed', [], { is_root: true })];
       const output = renderTree(tree, 0, '');
       expect(output).toContain('\u25a3 My Project');
+    });
+  });
+
+  describe('filterTree', () => {
+    function makeNode(
+      title: string,
+      state: string,
+      children: FeatureTreeNode[] = [],
+    ): FeatureTreeNode {
+      return {
+        id: '00000000-0000-0000-0000-000000000000',
+        project_id: '00000000-0000-0000-0000-000000000001',
+        title,
+        state: state as any,
+        priority: 0,
+        feature_number: null,
+        created_at: '',
+        updated_at: '',
+        children,
+      };
+    }
+
+    it('keeps only leaves matching the predicate', () => {
+      const tree = [
+        makeNode('Auth', 'proposed', [
+          makeNode('Login', 'proposed'),
+          makeNode('OAuth', 'implemented'),
+        ]),
+      ];
+      const filtered = filterTree(tree, (n) => n.state === 'proposed');
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].children).toHaveLength(1);
+      expect(filtered[0].children[0].title).toBe('Login');
+    });
+
+    it('removes branches with no matching leaves', () => {
+      const tree = [
+        makeNode('Auth', 'proposed', [
+          makeNode('Login', 'implemented'),
+          makeNode('OAuth', 'implemented'),
+        ]),
+      ];
+      const filtered = filterTree(tree, (n) => n.state === 'proposed');
+      expect(filtered).toHaveLength(0);
+    });
+
+    it('preserves parent structure for matching descendants', () => {
+      const tree = [
+        makeNode('Root', 'proposed', [
+          makeNode('Group', 'proposed', [
+            makeNode('Deep Leaf', 'proposed'),
+          ]),
+          makeNode('Other', 'implemented'),
+        ]),
+      ];
+      const filtered = filterTree(tree, (n) => n.state === 'proposed');
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].children).toHaveLength(1);
+      expect(filtered[0].children[0].title).toBe('Group');
+      expect(filtered[0].children[0].children).toHaveLength(1);
+      expect(filtered[0].children[0].children[0].title).toBe('Deep Leaf');
+    });
+
+    it('returns empty for no matches', () => {
+      const tree = [makeNode('Leaf', 'implemented')];
+      const filtered = filterTree(tree, (n) => n.state === 'proposed');
+      expect(filtered).toHaveLength(0);
     });
   });
 

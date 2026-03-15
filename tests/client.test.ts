@@ -126,11 +126,11 @@ describe('ManifestClient', () => {
       );
     });
 
-    it('calls GET /projects with directory_path query param', async () => {
-      mockFetch.mockResolvedValueOnce(jsonResponse({ projects: [] }));
+    it('calls GET /projects/by-directory with path query param', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse({ project: {}, directories: [] }));
       await client.listProjectsByDirectory('/my/path');
       const url = mockFetch.mock.calls[0][0];
-      expect(url).toContain('/projects?directory_path=');
+      expect(url).toContain('/projects/by-directory?path=');
       expect(url).toContain(encodeURIComponent('/my/path'));
     });
 
