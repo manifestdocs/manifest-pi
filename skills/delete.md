@@ -1,6 +1,6 @@
 ---
 name: delete
-description: Permanently delete an archived feature and all its descendants. Use only for cleanup of features that are no longer needed.
+description: Delete an archived feature permanently
 disable-model-invocation: true
 argument-hint: '[feature name]'
 ---

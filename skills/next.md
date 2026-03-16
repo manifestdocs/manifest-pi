@@ -1,6 +1,6 @@
 ---
 name: next
-description: Show the highest-priority feature ready for work. Use when the user asks "what should I work on?" or wants to find the next task.
+description: Show the next feature to work on
 disable-model-invocation: true
 ---
 

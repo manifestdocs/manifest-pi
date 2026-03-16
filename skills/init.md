@@ -1,6 +1,6 @@
 ---
 name: init
-description: Initialize Manifest for the current project. Detects project size and guides setup accordingly.
+description: Set up Manifest for this project
 disable-model-invocation: true
 ---
 

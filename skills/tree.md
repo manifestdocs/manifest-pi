@@ -1,6 +1,6 @@
 ---
 name: tree
-description: Display the feature hierarchy for the current project. Use when the user wants to see features, project structure, or asks "what features exist?"
+description: Show the project feature tree
 disable-model-invocation: true
 ---
 

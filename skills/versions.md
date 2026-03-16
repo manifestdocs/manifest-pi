@@ -1,6 +1,6 @@
 ---
 name: versions
-description: Show the version roadmap with release planning context. Use when the user asks about versions, releases, or milestones.
+description: Show the version roadmap
 disable-model-invocation: true
 ---
 

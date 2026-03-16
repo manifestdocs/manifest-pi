@@ -1,6 +1,6 @@
 ---
 name: assign
-description: Assign a feature to a version. Use when the user wants to schedule a feature for a release.
+description: Assign a feature to a version
 disable-model-invocation: true
 argument-hint: '[feature] [version]'
 ---

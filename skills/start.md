@@ -1,6 +1,6 @@
 ---
 name: start
-description: Begin work on a feature. MUST be used when the user asks to implement, work on, or build a feature—even if you just created the feature or already have context.
+description: Start working on a feature
 disable-model-invocation: true
 argument-hint: '[feature name or blank for next]'
 ---

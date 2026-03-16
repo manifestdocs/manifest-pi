@@ -1,6 +1,6 @@
 ---
 name: release
-description: Mark a version as released. Use when the user wants to ship a version or mark a milestone as complete.
+description: Mark a version as released
 disable-model-invocation: true
 argument-hint: '[version name]'
 ---

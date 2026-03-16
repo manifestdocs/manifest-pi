@@ -1,6 +1,6 @@
 ---
 name: complete
-description: Complete work on the current feature. Use when the user has finished implementing and wants to record their work.
+description: Finish the current feature and record your work
 disable-model-invocation: true
 ---
 

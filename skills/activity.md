@@ -1,6 +1,6 @@
 ---
 name: activity
-description: Show recent activity timeline for the current project. Use when the user asks "what happened?", "recent activity", or "show history".
+description: Show recent project activity
 disable-model-invocation: true
 ---
 

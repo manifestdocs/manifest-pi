@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Search for and display feature details. Use when the user wants to find a specific feature or asks about a feature by name.
+description: Search for a feature and show its details
 disable-model-invocation: true
 argument-hint: '[search query]'
 ---

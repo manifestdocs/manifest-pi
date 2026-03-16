@@ -1,6 +1,6 @@
 ---
-name: plan
-description: Interactive feature planning session. Use when the user wants to plan features, break down a PRD, or design the feature tree.
+name: decompose
+description: Decompose a PRD into a feature tree
 disable-model-invocation: true
 ---
 
