@@ -2,9 +2,14 @@
 name: decompose
 description: Decompose a PRD into a feature tree
 disable-model-invocation: true
+argument-hint: '[path to PRD/spec file, or blank to paste interactively]'
 ---
 
 Run an interactive feature planning session using structured reasoning phases.
+
+## Arguments
+
+`$ARGUMENTS` - Optional path to a PRD, spec, or feature description file (e.g., `PRD.md`, `docs/spec.md`). If provided, read the file and use its contents as input — skip the "Gather input" prompt in step 2.
 
 ## Steps
 
@@ -19,7 +24,12 @@ Run an interactive feature planning session using structured reasoning phases.
 
 ### 2. Gather input
 
-Check if the conversation contains initialization context from `/init` (look for "Initialization context:" with classification, since, and focused_directories fields).
+**If $ARGUMENTS is provided:**
+- Read the file at the given path
+- Use its contents as input for the analysis phases below
+- Skip the interactive prompt
+
+**Otherwise**, check if the conversation contains initialization context from `/init` (look for "Initialization context:" with classification, since, and focused_directories fields).
 
 **If classification is `greenfield`:**
 - Do NOT offer the "analyze" option (there's nothing to analyze)
@@ -75,6 +85,7 @@ Scan for anything that is vague, subjective, or underspecified. Collect these as
 - Unstated scope: "social login" -- which providers? "notifications" -- email, push, in-app?
 - Missing constraints: no mention of performance requirements, data limits, or supported platforms
 - Contradictions or tensions between stated requirements
+- **Data model decisions**: ID types (UUID vs integer vs ULID), enum representations (string vs integer), naming conventions (snake_case vs camelCase), timestamp formats (ISO 8601, Unix). If the input specifies these, record them. If it doesn't, flag the question -- these choices affect every feature that touches the data layer and must be consistent.
 
 Don't guess at answers. Collect them for the user.
 
@@ -109,9 +120,9 @@ Now structure your analysis into a feature tree:
 
 ### 5. Present the proposal
 
-Call `manifest_plan` with `confirm: false` to get a preview.
+Call `manifest_decompose` with `confirm: false` to get a preview.
 
-Display the proposed tree, then any clarification questions:
+Display the proposed tree FIRST, then any clarification questions AFTER. The tree is the primary output -- questions come last so the user sees what they're approving before deciding whether to refine.
 
 ```
 Proposed Feature Tree:
@@ -138,7 +149,7 @@ If there are no clarification questions, skip that section.
 
 - If user answers clarification questions, update the relevant feature specs and re-present
 - If user wants structural changes, modify and re-present
-- If user approves, call `manifest_plan` with `confirm: true`, then IMMEDIATELY proceed to steps 7 and 8 -- they are mandatory
+- If user approves, call `manifest_decompose` with `confirm: true`, then IMMEDIATELY proceed to steps 7 and 8 -- they are mandatory
 
 ### 7. Write root node project context (MANDATORY)
 
@@ -148,6 +159,8 @@ Call `manifest_update_feature` on the project's root feature to set its details 
 - Project overview (1-2 sentences)
 - Tech stack and key dependencies
 - Architectural decisions and conventions
+- Data model decisions resolved during Phase C (ID types, enum representations, naming conventions)
+- Integration rule: features that establish shared infrastructure (database, auth, caching, etc.) define the canonical implementation. Dependent features must use existing infrastructure, not create parallel implementations. If a database layer exists, endpoints use it -- no in-memory substitutes.
 - Any cross-cutting constraints (coding style, testing approach, directory structure)
 
 Also provide `details_summary` (~200 words) so breadcrumbs stay concise.

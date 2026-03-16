@@ -30,7 +30,7 @@ Initialize Manifest for a new or existing codebase. Adapts the flow based on pro
 - If a project is found, tell the user:
   ```
   This directory is already linked to project "[Name]".
-  Use /tree to see features or /plan to add new ones.
+  Use /tree to see features or /decompose to add new ones.
   ```
 - Exit early if already initialized
 - If no project found for this directory, call `manifest_list_projects` (no filter) to check for existing projects
@@ -134,7 +134,7 @@ This is a new project. Let's set up your roadmap.
   3. `Backlog` - "Later"
 - Display summary, then:
   ```
-  Want to plan features? Run /plan
+  Want to plan features? Run /decompose
   ```
 
 #### SMALL/MEDIUM path
@@ -165,7 +165,7 @@ Detected [language] project with [N] modules and [N] commits.
     4. `Backlog` - "Later"
 - Display summary, then:
   ```
-  Want to plan? I can analyze your codebase. Run /plan
+  Want to plan? I can analyze your codebase. Run /decompose
   ```
 
 #### LARGE path
@@ -226,18 +226,18 @@ Versions created:
   Backlog (Later) - future ideas
 
 Next steps:
-- /plan to design your feature tree
+- /decompose to design your feature tree
 - /tree to see what exists
 ```
 
-### 6. Handoff to plan
+### 6. Handoff to decompose
 
 End with:
 ```
-Want me to help plan features now? Run /plan
+Want me to help plan features now? Run /decompose
 ```
 
-Output scoping context as structured text that the plan skill can reference:
+Output scoping context as structured text that the decompose skill can reference:
 ```
 Initialization context:
 - Classification: [greenfield/small_medium/large]

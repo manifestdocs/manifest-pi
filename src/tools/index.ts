@@ -356,9 +356,9 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
   });
 
   pi.registerTool({
-    name: 'manifest_plan',
+    name: 'manifest_decompose',
     description: 'Decompose a PRD or vision into a feature tree. Use confirm=false to preview, confirm=true to create.',
-    label: 'Plan and create a Manifest feature tree',
+    label: 'Decompose a PRD into a Manifest feature tree',
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
       features: Type.Array(Type.Recursive((Self) => Type.Object({
