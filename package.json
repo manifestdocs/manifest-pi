@@ -16,16 +16,13 @@
   },
   "pi": {
     "extensions": [
-      "extensions/manifest.ts"
+      "extensions/feature-workflow.ts"
     ],
     "skills": [
       "skills/*.md"
     ],
     "prompts": [
       "prompts/manifest.md"
-    ],
-    "agents": [
-      "agents/*.md"
     ]
   },
   "scripts": {
