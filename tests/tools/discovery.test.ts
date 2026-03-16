@@ -4,7 +4,7 @@ import {
   handleListProjects,
   handleFindFeatures,
   handleGetFeature,
-  handleGetActiveFeature,
+
   handleGetNextFeature,
   handleRenderFeatureTree,
   handleOrient,
@@ -21,7 +21,7 @@ function createMockClient(): ManifestClient {
     getFeatureHistory: vi.fn(),
     getFeatureTree: vi.fn(),
     getProject: vi.fn(),
-    getActiveFeature: vi.fn(),
+
     getNextFeature: vi.fn(),
     getProjectHistory: vi.fn(),
   } as unknown as ManifestClient;
@@ -174,29 +174,6 @@ describe('discovery tools', () => {
     });
   });
 
-  describe('handleGetActiveFeature', () => {
-    it('calls client.getActiveFeature', async () => {
-      (client.getActiveFeature as any).mockResolvedValue({
-        id: '1',
-        title: 'Active Feature',
-        state: 'in_progress',
-      });
-
-      const result = await handleGetActiveFeature(client, { project_id: 'proj-1' });
-      expect(client.getActiveFeature).toHaveBeenCalledWith('proj-1');
-      expect(result).toContain('Active Feature');
-    });
-
-    it('returns connection error when server is down', async () => {
-      (client.getActiveFeature as any).mockRejectedValue(
-        new ConnectionError('http://localhost:17010'),
-      );
-
-      const result = await handleGetActiveFeature(client, { project_id: 'proj-1' });
-      expect(result).toContain('Cannot connect to Manifest server');
-    });
-  });
-
   describe('handleGetNextFeature', () => {
     it('calls client.getNextFeature', async () => {
       (client.getNextFeature as any).mockResolvedValue({
@@ -292,12 +269,6 @@ describe('discovery tools', () => {
         name: 'My Project',
         key_prefix: 'MP',
       });
-      (client.getActiveFeature as any).mockResolvedValue({
-        id: '2',
-        title: 'Login',
-        state: 'in_progress',
-        display_id: 'MP-1',
-      });
       (client.findFeatures as any).mockResolvedValue([
         { id: '3', title: 'Signup', state: 'proposed', priority: 0 },
       ]);
@@ -314,7 +285,6 @@ describe('discovery tools', () => {
       const result = await handleOrient(client, { directory_path: '/my/project' });
       expect(result).toContain('My Project');
       expect(result).toContain('Auth');
-      expect(result).toContain('Login');
       expect(result).toContain('Signup');
       expect(result).toContain('Project initialized');
     });
@@ -326,7 +296,7 @@ describe('discovery tools', () => {
 
     it('works with project_id directly', async () => {
       (client.getFeatureTree as any).mockResolvedValue([]);
-      (client.getActiveFeature as any).mockResolvedValue(null);
+
       (client.findFeatures as any).mockResolvedValue([]);
       (client.getProjectHistory as any).mockResolvedValue([]);
 

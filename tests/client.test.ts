@@ -335,13 +335,5 @@ describe('ManifestClient', () => {
       expect(opts.method).toBe('POST');
     });
 
-    it('calls GET /projects/{id}/features/active for getActiveFeature', async () => {
-      mockFetch.mockResolvedValueOnce(jsonResponse({ id: '1' }));
-      await client.getActiveFeature('proj-1');
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/projects/proj-1/features/active',
-        expect.objectContaining({ method: 'GET' }),
-      );
-    });
-  });
+});
 });

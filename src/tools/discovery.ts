@@ -179,30 +179,6 @@ export async function handleGetFeature(
 }
 
 // ============================================================
-// get_active_feature
-// ============================================================
-
-interface GetActiveFeatureParams {
-  project_id?: string;
-  directory_path?: string;
-}
-
-export async function handleGetActiveFeature(
-  client: ManifestClient,
-  params: GetActiveFeatureParams,
-): Promise<string> {
-  try {
-    const projectId = await resolveProjectId(client, params);
-    if (!projectId) return 'No project found. Pass project_id or directory_path.';
-    const result = await client.getActiveFeature(projectId) as any;
-    if (!result || !result.id) return 'No feature is currently selected in the Manifest app.';
-    return formatFeatureSummary(result);
-  } catch (err) {
-    return handleError(err);
-  }
-}
-
-// ============================================================
 // get_next_feature
 // ============================================================
 
@@ -238,14 +214,33 @@ function formatStaleFeatures(body: string): string {
       data = JSON.parse(data.error);
     }
     const features = data.features ?? [];
+    const completable = features.filter((f: any) => f.completable);
+    const stalled = features.filter((f: any) => !f.completable);
     const parts: string[] = [];
     parts.push(`## ${features.length} feature(s) still in progress\n`);
-    parts.push('Complete or release these before starting new work:\n');
-    for (const f of features) {
-      const id = f.display_id ?? f.id?.slice(0, 8);
-      parts.push(`- ${id} ${f.title} (${f.state})`);
+
+    if (completable.length > 0) {
+      parts.push(`### Ready to complete (${completable.length})\n`);
+      parts.push('These have passing proofs -- call manifest_complete_feature with a summary and commit SHAs:\n');
+      for (const f of completable) {
+        const id = f.display_id ?? f.id?.slice(0, 8);
+        parts.push(`- ${id} ${f.title} [proof passed ${f.proof_status?.created_at ?? ''}]`);
+      }
     }
-    parts.push('\nUse manifest_complete_feature to finish them, or manifest_update_feature to archive if abandoned.');
+
+    if (stalled.length > 0) {
+      if (completable.length > 0) parts.push('');
+      parts.push(`### Still needs work (${stalled.length})\n`);
+      for (const f of stalled) {
+        const id = f.display_id ?? f.id?.slice(0, 8);
+        const proofNote = f.proof_status
+          ? ` [proof failed, exit_code=${f.proof_status.exit_code}]`
+          : ' [no proof recorded]';
+        parts.push(`- ${id} ${f.title}${proofNote}`);
+      }
+    }
+
+    parts.push('\nComplete or archive these before starting new work.');
     return parts.join('\n');
   } catch {
     return body;
@@ -323,9 +318,8 @@ export async function handleOrient(
     if (!projectId) return 'No project found. Use manifest_init_project to create one.';
 
     // Parallel fetch
-    const [tree, active, proposed, history] = await Promise.all([
+    const [tree, proposed, history] = await Promise.all([
       client.getFeatureTree(projectId).catch(() => []),
-      client.getActiveFeature(projectId).catch(() => null),
       client.findFeatures({ project_id: projectId, state: 'proposed', limit: 3 }).catch(() => []),
       client.getProjectHistory(projectId, { limit: 5 }).catch(() => []),
     ]);
@@ -350,14 +344,6 @@ export async function handleOrient(
       parts.push('');
       parts.push('## Feature Tree');
       parts.push(renderTree(tree, 2, keyPrefix));
-    }
-
-    // Active feature
-    const activeAny = active as any;
-    if (activeAny?.id) {
-      parts.push('## Active Feature');
-      parts.push(`${stateSymbol(activeAny.state)} ${activeAny.title} (${activeAny.state})`);
-      if (activeAny.display_id) parts.push(`  ID: ${activeAny.display_id}`);
     }
 
     // Work queue

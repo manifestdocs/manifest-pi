@@ -21,9 +21,7 @@ Search for and display feature details.
 2. Find the feature:
 
    **If $ARGUMENTS is blank:**
-   - Call `manifest_get_active_feature` with the project ID
-   - If a feature is focused, use that feature_id directly (skip to step 4)
-   - If no focus, tell the user to provide a search query or select a feature in the app
+   - Tell the user to provide a search query or use `/tree` to browse features
 
    **If $ARGUMENTS is provided:**
    - Call `manifest_find_features` with `project_id` and `query` set to `$ARGUMENTS`

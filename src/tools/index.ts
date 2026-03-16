@@ -12,7 +12,7 @@ import {
   handleListProjects,
   handleFindFeatures,
   handleGetFeature,
-  handleGetActiveFeature,
+
   handleGetNextFeature,
   handleRenderFeatureTree,
   handleOrient,
@@ -51,7 +51,7 @@ export {
   handleListProjects,
   handleFindFeatures,
   handleGetFeature,
-  handleGetActiveFeature,
+
   handleGetNextFeature,
   handleRenderFeatureTree,
   handleOrient,
@@ -146,20 +146,6 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
   });
 
   pi.registerTool({
-    name: 'manifest_get_active_feature',
-    description: 'Get the feature currently selected in the Manifest app. Call this first when the user says "this feature" or "work on this".',
-    label: 'Get the active/selected feature from Manifest UI',
-    parameters: Type.Object({
-      project_id: Type.Optional(Type.String({ description: 'Project UUID' })),
-      directory_path: Type.Optional(Type.String({ description: 'Directory path for auto-discovery (alternative to project_id)' })),
-    }),
-    async execute(_id: string, params: any) {
-      const text = await handleGetActiveFeature(client, params);
-      return toolResult(text);
-    },
-  });
-
-  pi.registerTool({
     name: 'manifest_get_next_feature',
     description: 'Get the highest-priority workable feature. Use ONLY when the user says "next feature" or "what\'s next".',
     label: 'Get next priority feature to work on',
@@ -192,8 +178,8 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
 
   pi.registerTool({
     name: 'manifest_orient',
-    description: 'Session bootloader. Returns project overview: feature tree (depth 2), active feature, work queue, recent activity. Call at session start.',
-    label: 'Get full project orientation (tree, active, queue, history)',
+    description: 'Session bootloader. Returns project overview: feature tree (depth 2), work queue, recent activity. Call at session start.',
+    label: 'Get full project orientation (tree, queue, history)',
     parameters: Type.Object({
       project_id: Type.Optional(Type.String({ description: 'Project UUID (optional if directory_path provided)' })),
       directory_path: Type.Optional(Type.String({ description: 'Directory path to auto-discover project' })),

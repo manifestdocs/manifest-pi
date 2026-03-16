@@ -240,10 +240,6 @@ export class ManifestClient {
     return this.request('GET', path);
   }
 
-  async getActiveFeature(projectId: string): Promise<unknown> {
-    return this.request('GET', `/projects/${projectId}/features/active`);
-  }
-
   async getFeatureHistory(featureId: string): Promise<FeatureHistory[]> {
     return this.request('GET', `/features/${featureId}/history`);
   }

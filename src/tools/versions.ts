@@ -23,12 +23,13 @@ export async function handleListVersions(
     if (resp.versions.length === 0) return 'No versions defined.';
 
     const rows = resp.versions.map((v) => [
+      v.id,
       v.name,
       v.status,
       String(v.feature_count),
       v.description ?? '',
     ]);
-    let output = markdownTable(['Version', 'Status', 'Features', 'Description'], rows);
+    let output = markdownTable(['ID', 'Version', 'Status', 'Features', 'Description'], rows);
     if (resp.backlog_count > 0) {
       output += `\nBacklog: ${resp.backlog_count} unassigned features`;
     }

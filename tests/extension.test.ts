@@ -48,7 +48,7 @@ function createMockPi() {
   const tools: RegisteredTool[] = [];
   const eventHandlers: EventHandler[] = [];
   const activeTools: string[] = [];
-  const userMessages: string[] = [];
+  const sentMessages: Array<{ message: any; options: any }> = [];
 
   const api = {
     registerCommand: vi.fn((name: string, options: any) => {
@@ -60,8 +60,9 @@ function createMockPi() {
     on: vi.fn((event: string, handler: any) => {
       eventHandlers.push({ event, handler });
     }),
-    sendUserMessage: vi.fn((content: string) => {
-      userMessages.push(content);
+    sendUserMessage: vi.fn(),
+    sendMessage: vi.fn((message: any, options: any) => {
+      sentMessages.push({ message, options });
     }),
     getAllTools: vi.fn(() =>
       tools.map((t) => ({ name: t.name, description: t.description })),
@@ -74,7 +75,7 @@ function createMockPi() {
     exec: vi.fn(async () => ({ stdout: '', stderr: '', code: 0, killed: false })),
   };
 
-  return { api, commands, tools, eventHandlers, activeTools, userMessages };
+  return { api, commands, tools, eventHandlers, activeTools, sentMessages };
 }
 
 // Dynamically import the extension factory — it reads skill files from disk
@@ -129,15 +130,19 @@ describe('Manifest Pi extension', () => {
       }
     });
 
-    it('command handlers call sendUserMessage with skill content', async () => {
+    it('command handlers send hidden message with skill content', async () => {
       const nextCmd = pi.commands.find((c) => c.name === 'next');
       expect(nextCmd).toBeDefined();
 
       await nextCmd!.handler('', {} as any);
-      expect(pi.api.sendUserMessage).toHaveBeenCalledTimes(1);
+      expect(pi.api.sendMessage).toHaveBeenCalledTimes(1);
+      expect(pi.api.sendUserMessage).not.toHaveBeenCalled();
 
-      const content = pi.userMessages[0];
-      expect(content).toContain('manifest_get_next_feature');
+      const { message, options } = pi.sentMessages[0];
+      expect(message.customType).toBe('manifest-skill');
+      expect(message.display).toBe(false);
+      expect(message.content).toContain('manifest_get_next_feature');
+      expect(options.triggerTurn).toBe(true);
     });
 
     it('command handlers replace $ARGUMENTS in skill content', async () => {
@@ -145,11 +150,20 @@ describe('Manifest Pi extension', () => {
       expect(startCmd).toBeDefined();
 
       await startCmd!.handler('my-feature', {} as any);
-      expect(pi.api.sendUserMessage).toHaveBeenCalledTimes(1);
+      expect(pi.api.sendMessage).toHaveBeenCalledTimes(1);
 
-      const content = pi.userMessages[0];
+      const content = pi.sentMessages[0].message.content;
       expect(content).toContain('my-feature');
       expect(content).not.toContain('$ARGUMENTS');
+    });
+
+    it('command handlers strip frontmatter from skill content', async () => {
+      const nextCmd = pi.commands.find((c) => c.name === 'next');
+      await nextCmd!.handler('', {} as any);
+
+      const content = pi.sentMessages[0].message.content;
+      expect(content).not.toContain('---');
+      expect(content).not.toContain('disable-model-invocation');
     });
   });
 

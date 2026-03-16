@@ -4,6 +4,7 @@
 
 import type { ManifestClient } from '../client.js';
 import { ApiError } from '../client.js';
+import { renderProofChecklist, stateSymbol, timeBucket } from '../format.js';
 
 // ============================================================
 // verify_feature
@@ -76,14 +77,54 @@ export async function handleGetFeatureProof(
   params: GetFeatureProofParams,
 ): Promise<string> {
   try {
-    const result = await client.getFeatureProof(params.feature_id);
-    return formatResponse(result);
+    const result = await client.getFeatureProof(params.feature_id) as any;
+    if (!result) return 'No proof recorded for this feature.';
+    return formatProof(result);
   } catch (err) {
     if (err instanceof ApiError) {
+      if (err.status === 404) return 'No proof recorded for this feature.';
       return `Error (${err.status}): ${err.body}`;
     }
     throw err;
   }
+}
+
+function formatProof(proof: any): string {
+  const parts: string[] = [];
+  const exitIcon = proof.exit_code === 0 ? '\u2713' : '\u2717'; // ✓ or ✗
+  const status = proof.exit_code === 0 ? 'PASSED' : 'FAILED';
+  const when = proof.created_at ? timeBucket(proof.created_at) : '';
+
+  // Header
+  parts.push(`${exitIcon} Proof: ${status}${when ? `  (${when})` : ''}`);
+  parts.push(`  Command: ${proof.command}`);
+  parts.push(`  Exit code: ${proof.exit_code}`);
+  if (proof.agent_type) parts.push(`  Agent: ${proof.agent_type}`);
+  if (proof.commit_sha) parts.push(`  Commit: ${proof.commit_sha}`);
+
+  // Test results — use the checklist renderer
+  const suites = proof.test_suites ?? proof.tests;
+  if (Array.isArray(suites) && suites.length > 0) {
+    parts.push('');
+    parts.push(renderProofChecklist(suites));
+  } else if (proof.output) {
+    // Fallback to raw output if no structured tests
+    parts.push('');
+    parts.push('Output:');
+    parts.push(proof.output);
+  }
+
+  // Evidence files
+  if (Array.isArray(proof.evidence) && proof.evidence.length > 0) {
+    parts.push('');
+    parts.push('Evidence:');
+    for (const e of proof.evidence) {
+      const note = e.note ? ` -- ${e.note}` : '';
+      parts.push(`  ${e.path}${note}`);
+    }
+  }
+
+  return parts.join('\n');
 }
 
 // ============================================================

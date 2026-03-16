@@ -34,10 +34,7 @@ The `manifest_start_feature` tool records that work is beginning and returns the
    - If multiple matches, list them and ask which one
 
    **If $ARGUMENTS is blank:**
-   - First, call `manifest_get_active_feature` with the project ID
-   - If a feature is focused, ask: "I see '[title]' is selected in the app. Work on this?"
-   - If the user confirms, use that feature_id
-   - If no focus, or the user declines, call `manifest_get_next_feature` with the project ID
+   - Call `manifest_get_next_feature` with the project ID
    - If no feature found, tell the user there's nothing to work on
 
 3. Start the feature:

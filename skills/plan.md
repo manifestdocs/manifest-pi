@@ -138,34 +138,37 @@ If there are no clarification questions, skip that section.
 
 - If user answers clarification questions, update the relevant feature specs and re-present
 - If user wants structural changes, modify and re-present
-- If user approves, call `manifest_plan` with `confirm: true`
+- If user approves, call `manifest_plan` with `confirm: true`, then IMMEDIATELY proceed to steps 7 and 8 -- they are mandatory
 
-### 7. Distill the root feature
+### 7. Write root node project context (MANDATORY)
 
-After creating child features, the source PRD/spec content should NOT remain verbatim on the root. The detailed content has been distributed to children -- the root should now hold only high-level project context.
+**Do NOT skip this step.** The root feature is the project's living context document -- like a CLAUDE.md that agents read via breadcrumb before working on any child feature.
 
-Call `manifest_update_feature` on the project's root feature to replace its details with:
+Call `manifest_update_feature` on the project's root feature to set its details to:
 - Project overview (1-2 sentences)
 - Tech stack and key dependencies
 - Architectural decisions and conventions
-- Any cross-cutting constraints
+- Any cross-cutting constraints (coding style, testing approach, directory structure)
 
 Also provide `details_summary` (~200 words) so breadcrumbs stay concise.
 
-If the root feature had no details (PRD was pasted directly), write project-level context based on what you learned during analysis. If the root already had appropriate high-level content (not a PRD), skip this step.
+If the PRD was pasted directly into the root, distill it -- the detailed requirements have been distributed to children. If the root had no content, write project-level context based on what you learned during analysis. If the root already has appropriate high-level context, leave it.
 
-### 8. Create versions and distribute features
+### 8. Create versions and distribute features (MANDATORY)
 
-Features should be organized into shippable increments, not dumped into a single version:
+**Do NOT skip this step.** Features must be assigned to semantic versions, not left in the backlog.
 
 1. Call `manifest_list_versions` first -- if versions already exist (e.g., from `/init`), build on them rather than creating duplicates
-2. Assess scope: a simple app (1-10 features) may need just one version; a complex app needs multiple
-   versions that build incrementally from MVP to full-featured
-3. If no versions exist, create them with `manifest_create_version` using semantic versioning. For new projects, start at 0.1.0.
+2. Create versions with `manifest_create_version` using semantic versioning:
+   - 0.1.0: foundational features (project setup, data model, basic CRUD)
+   - 0.2.0: features that build on 0.1.0 (filtering, pagination, validation)
+   - 0.3.0+: advanced features (soft delete, tagging, integrations)
    For existing projects, continue from the latest version.
-4. Assign features to versions using `manifest_set_feature_version`. Think about dependency order -- features that
-   others depend on must ship first. Group tightly-coupled features in the same version.
-5. Each version should be a shippable increment that delivers usable value on its own
+3. Assign EVERY feature to a version using `manifest_set_feature_version`:
+   - Think about dependency order -- features that others depend on ship first
+   - Group tightly-coupled features in the same version
+   - Each version should be a shippable increment that delivers usable value
+4. No features should remain in the backlog after this step
 
 ### 9. Display result
 
