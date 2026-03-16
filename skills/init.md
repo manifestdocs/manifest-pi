@@ -8,6 +8,22 @@ Initialize Manifest for a new or existing codebase. Adapts the flow based on pro
 
 ## Steps
 
+### 0. Ensure git is initialized
+
+- Run `git rev-parse --is-inside-work-tree 2>/dev/null` in the current working directory
+- If git is NOT initialized:
+  - Run `git init`
+  - Create a `.gitignore` appropriate for the detected project type (check for package.json, Cargo.toml, pyproject.toml, etc.):
+    - Node.js: `node_modules/`, `dist/`, `.env`
+    - Python: `__pycache__/`, `*.pyc`, `.venv/`, `.env`
+    - Rust: `target/`
+    - General: `.DS_Store`, `*.log`
+  - Stage and commit: `git add . && git commit -m "Initial commit"`
+  - Tell the user: `Initialized git repository with .gitignore for [detected type].`
+- If git IS initialized but there are no commits (`git log --oneline -1` fails), create an initial commit:
+  - Create `.gitignore` if it doesn't exist (same heuristics as above)
+  - Stage and commit: `git add . && git commit -m "Initial commit"`
+
 ### 1. Check if already initialized
 
 - Call `manifest_list_projects` with `directory_path` set to the current working directory
@@ -36,6 +52,63 @@ Initialize Manifest for a new or existing codebase. Adapts the flow based on pro
 
 - Call `manifest_init_project` with `directory_path` set to the current working directory and `skip_default_versions` set to `true`
 - This creates the project, links the directory, and returns analysis with size signals
+- After project creation, call `manifest_get_project_instructions` with the project ID to get the root feature
+- Call `manifest_update_feature` on the root feature to set `details` to coding guidelines adapted from the template below
+- **Adapt the guidelines to the project's language and framework.** Keep the same structure and principles, but make examples and conventions language-native. For example:
+  - Python: mention type hints, `pytest`, PEP 8, virtual environments
+  - Rust: mention ownership, `cargo test`, `clippy`, error handling with `Result`
+  - Go: mention `go test`, error returns, `golint`, module structure
+  - TypeScript/Node: mention strict mode, `vitest`/`jest`, ESM, type safety
+  - Ruby: mention RSpec, Rubocop, gems
+- Replace generic advice with idiomatic equivalents (e.g., "guard clauses" stays universal, but "pure functions" might become "value objects" in OOP-heavy languages)
+- Append a "Project Details" section with detected specifics (language version, framework, test runner, package manager)
+
+#### Coding guidelines template
+
+```
+# AI Code Assistance Guidelines
+
+## Core Principles
+* Simplicity First: Generate the most direct solution that meets requirements
+* Established Tech: Default to proven technologies unless newer approaches requested
+* Explicit Code: Write straightforward code; avoid clever one-liners
+* Reason Then Code: Show logic before implementing complex solutions
+
+## Implementation
+* Implement Only What's Asked: No extra features or future-proofing unless requested
+* Contract-First Development: Define interfaces and contracts (e.g., OpenAPI) before implementation when building integrations
+* Start with Happy Path: Handle edge cases later unless security concerns
+* Lean Code: Skip retry logic and other complexity unless explicitly needed
+* Show Your Work: Explain key decisions and non-obvious choices
+* Ask About Backwards Compatibility: Always inquire rather than assume; it can add unnecessary code
+
+## Code Structure
+* Limit Nesting: Keep conditionals/loops under 3 layers
+* Function Length: 25-30 lines max; break up longer functions
+* Favor Pure Functions: Minimize side effects
+* Concrete Over Abstract: Avoid abstraction unless it adds real value
+* Unix Philosophy: Each function should do one thing well; prefer composition
+* Feature-First Organization: Group by functionality, then by type
+
+## Best Practices
+* Choose Right Tools: Use built-in features when sufficient; add packages when they save significant time/add real value
+* Validate Inputs: Include reasonable validation, especially for user data
+* Think Security: Consider security implications even when not mentioned
+* Secrets Management: NEVER commit secrets, API keys, or credentials to version control. Use environment variables, secret management systems, or secure vaults. Include .env in .gitignore.
+* Early Return: Use guard clauses to reduce complexity
+* Project Hygiene: Version via git, branch per feature/fix, maintain centralized and living documentation
+
+## Testing
+* Test-Driven Development: Write tests first when requirements are clear. Tests should describe intended behavior and serve as executable documentation.
+* Tests as Specifications: Structure tests to clearly articulate what the code should do, not how it does it. New developers should understand functionality by reading tests.
+* Test Levels: Use unit tests for domain logic, integration tests for API contracts and component interactions
+
+## Response Approach
+* Plan Complex Tasks: Outline approach before implementation
+* Ask Questions: Clarify ambiguous requirements
+* Incremental Solutions: Break down complex problems
+* Offer Alternatives: Present options with trade-offs when appropriate
+```
 
 ### 3. Classify project size
 
