@@ -7,6 +7,7 @@
 
 import type { ExtensionAPI, ExtensionContext, ToolCallEvent, ToolResultEvent } from '@mariozechner/pi-coding-agent';
 import type { WorkflowState } from './state.js';
+import type { PlanModeController } from './plan-mode.js';
 import {
   evaluateMustStart,
   evaluateMustProve,
@@ -16,7 +17,11 @@ import {
   evaluateReadyForCompletion,
 } from './gates.js';
 
-export function registerGates(pi: ExtensionAPI, state: WorkflowState): void {
+export function registerGates(
+  pi: ExtensionAPI,
+  state: WorkflowState,
+  planController?: PlanModeController,
+): void {
   // -- tool_call: evaluate hard gates before execution --
   pi.on('tool_call', async (event: ToolCallEvent, _ctx: ExtensionContext) => {
     if (event.toolName === 'manifest_start_feature') {
@@ -65,6 +70,11 @@ export function registerGates(pi: ExtensionAPI, state: WorkflowState): void {
       state.featureStarted(featureId);
       if (state.teamMode) {
         state.advancePhase(featureId, 'implementing');
+      }
+
+      // Auto-enter plan mode for code exploration before implementation
+      if (planController && planController.getState() === 'normal') {
+        planController.enter(pi);
       }
     }
 
