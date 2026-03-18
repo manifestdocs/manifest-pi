@@ -1,6 +1,6 @@
 {
-  "name": "@manifest/pi",
-  "version": "0.1.0",
+  "name": "@manifestdocs/pi",
+  "version": "2.0.0",
   "description": "Manifest integration for Pi coding agent — feature-driven development tools",
   "type": "module",
   "license": "MIT",
@@ -14,6 +14,7 @@
     "type": "git",
     "url": "https://github.com/manifestdocs/manifest-pi.git"
   },
+  "files": ["dist", "extensions", "skills", "prompts", "package.json"],
   "pi": {
     "extensions": [
       "extensions/feature-workflow.ts"

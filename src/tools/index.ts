@@ -19,6 +19,7 @@ import {
 } from './discovery.js';
 import {
   handleStartFeature,
+  handleAssessPlan,
   handleUpdateFeature,
   handleProveFeature,
   handleCompleteFeature,
@@ -29,7 +30,6 @@ import {
   handleCreateFeature,
   handleDeleteFeature,
   handlePlan,
-  handleGetProjectInstructions,
   handleGetProjectHistory,
   handleGenerateFeatureTree,
   handleSync,
@@ -56,6 +56,7 @@ export {
   handleRenderFeatureTree,
   handleOrient,
   handleStartFeature,
+  handleAssessPlan,
   handleUpdateFeature,
   handleProveFeature,
   handleCompleteFeature,
@@ -64,7 +65,6 @@ export {
   handleCreateFeature,
   handleDeleteFeature,
   handlePlan,
-  handleGetProjectInstructions,
   handleGetProjectHistory,
   handleGenerateFeatureTree,
   handleSync,
@@ -92,6 +92,16 @@ function toolResult(text: string) {
   return { content: [{ type: 'text' as const, text }], details: undefined };
 }
 
+function createExecuteHandler<P>(
+  client: ManifestClient,
+  handler: (client: ManifestClient, params: P) => Promise<string>,
+) {
+  return async (_id: string, params: unknown) => {
+    const text = await handler(client, params as P);
+    return toolResult(text);
+  };
+}
+
 // ============================================================
 // Discovery Tools
 // ============================================================
@@ -106,10 +116,7 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
         description: 'Directory path to find the project for (auto-discovery)',
       })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleListProjects(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleListProjects),
   });
 
   pi.registerTool({
@@ -124,10 +131,7 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
       limit: Type.Optional(Type.Number({ description: 'Max results to return' })),
       offset: Type.Optional(Type.Number({ description: 'Number to skip for pagination' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleFindFeatures(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleFindFeatures),
   });
 
   pi.registerTool({
@@ -139,10 +143,7 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
       view: Type.Optional(StringEnum(["card", "full"] as const, { description: 'Display format. "card" (default): compact feature card. "full": includes breadcrumb, siblings, history.' })),
       include_history: Type.Optional(Type.Boolean({ description: 'Include implementation history. Only used with view="full". Default false.' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleGetFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleGetFeature),
   });
 
   pi.registerTool({
@@ -154,10 +155,7 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
       directory_path: Type.Optional(Type.String({ description: 'Directory path for auto-discovery (alternative to project_id)' })),
       version_id: Type.Optional(Type.String({ description: 'Optional version UUID to filter by' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleGetNextFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleGetNextFeature),
   });
 
   pi.registerTool({
@@ -170,10 +168,7 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
       max_depth: Type.Optional(Type.Number({ description: 'Max depth (0 = unlimited). Default 0.' })),
       state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "Filter tree to branches containing leaves in this state" })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleRenderFeatureTree(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleRenderFeatureTree),
   });
 
   pi.registerTool({
@@ -184,10 +179,7 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
       project_id: Type.Optional(Type.String({ description: 'Project UUID (optional if directory_path provided)' })),
       directory_path: Type.Optional(Type.String({ description: 'Directory path to auto-discover project' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleOrient(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleOrient),
   });
 }
 
@@ -206,10 +198,18 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
       force: Type.Optional(Type.Boolean({ description: 'Force start even if claimed. Default false.' })),
       claim_metadata: Type.Optional(Type.String({ description: 'JSON metadata (branch, worktree, etc.)' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleStartFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleStartFeature),
+  });
+
+  pi.registerTool({
+    name: 'manifest_assess_plan',
+    description: 'Assess a numbered implementation plan for a feature and return a graded ceremony tier: auto, tracked, or full. Use after manifest_start_feature.',
+    label: 'Assess a Manifest implementation plan',
+    parameters: Type.Object({
+      feature_id: Type.String({ description: 'Feature UUID or display ID' }),
+      plan: Type.String({ description: 'Implementation plan text. Prefer a `Plan:` header followed by numbered steps. Include `[COMPLEX]` to escalate.' }),
+    }),
+    execute: createExecuteHandler(client, handleAssessPlan),
   });
 
   pi.registerTool({
@@ -229,10 +229,7 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
       clear_version: Type.Optional(Type.Boolean({ description: 'Unassign from version' })),
       blocked_by: Type.Optional(Type.Array(Type.String(), { description: 'Feature IDs that block this' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleUpdateFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleUpdateFeature),
   });
 
   pi.registerTool({
@@ -250,10 +247,10 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
         tests: Type.Array(Type.Object({
           name: Type.String({ description: 'Test name' }),
           state: StringEnum(["passed", "failed", "errored", "skipped"] as const, { description: "Test result state" }),
-          file: Type.Optional(Type.String()),
-          line: Type.Optional(Type.Number()),
-          duration_ms: Type.Optional(Type.Number()),
-          message: Type.Optional(Type.String()),
+          file: Type.Optional(Type.String({ description: 'Source file path for the test case' })),
+          line: Type.Optional(Type.Number({ description: '1-based source line number for the test case' })),
+          duration_ms: Type.Optional(Type.Number({ description: 'Test duration in milliseconds' })),
+          message: Type.Optional(Type.String({ description: 'Failure or diagnostic message' })),
         })),
       }), { description: 'Structured test results grouped by suite (preferred)' })),
       evidence: Type.Optional(Type.Array(Type.Object({
@@ -262,10 +259,7 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
       }))),
       commit_sha: Type.Optional(Type.String({ description: 'Git commit SHA at time of proving' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleProveFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleProveFeature),
   });
 
   pi.registerTool({
@@ -276,15 +270,15 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
       summary: Type.String({ description: 'Work summary. First line = headline.' }),
       commits: Type.Array(Type.Union([
-        Type.String(),
-        Type.Object({ sha: Type.String(), message: Type.String() }),
+        Type.String({ description: 'Git commit SHA' }),
+        Type.Object({
+          sha: Type.String({ description: 'Git commit SHA' }),
+          message: Type.String({ description: 'Commit message' }),
+        }),
       ]), { description: 'Git commit SHAs or {sha, message} objects' }),
       backfill: Type.Optional(Type.Boolean({ description: 'Skip proof/spec requirements. Default false.' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleCompleteFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleCompleteFeature),
   });
 }
 
@@ -301,10 +295,7 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
       directory_path: Type.String({ description: 'Absolute path to the project directory' }),
       skip_default_versions: Type.Optional(Type.Boolean({ description: 'Skip creating default versions. Default false.' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleInitProject(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleInitProject),
   });
 
   pi.registerTool({
@@ -318,10 +309,7 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
       is_primary: Type.Optional(Type.Boolean({ description: 'Is primary directory. Default false.' })),
       instructions: Type.Optional(Type.String({ description: 'Directory-specific instructions' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleAddProjectDirectory(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleAddProjectDirectory),
   });
 
   pi.registerTool({
@@ -336,10 +324,7 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
       state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "Initial state. Default 'proposed'." })),
       priority: Type.Optional(Type.Number({ description: 'Priority (lower = first). Default 0.' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleCreateFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleCreateFeature),
   });
 
   pi.registerTool({
@@ -349,10 +334,7 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID' }),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleDeleteFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleDeleteFeature),
   });
 
   pi.registerTool({
@@ -366,28 +348,12 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
         details: Type.Optional(Type.String({ description: 'Spec or shared context' })),
         priority: Type.Number({ description: 'Priority (lower = first)' }),
         state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "Initial state. Default 'proposed'." })),
-        children: Type.Array(Self),
+        children: Type.Array(Self, { description: 'Nested child features' }),
       })), { description: 'Proposed feature tree' }),
       confirm: Type.Boolean({ description: 'true to create, false to preview' }),
       target_version_id: Type.Optional(Type.String({ description: 'Version UUID for all features' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handlePlan(client, params);
-      return toolResult(text);
-    },
-  });
-
-  pi.registerTool({
-    name: 'manifest_get_project_instructions',
-    description: 'Get full project instructions (coding guidelines, conventions).',
-    label: 'Get Manifest project instructions',
-    parameters: Type.Object({
-      project_id: Type.String({ description: 'Project UUID' }),
-    }),
-    async execute(_id: string, params: any) {
-      const text = await handleGetProjectInstructions(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handlePlan),
   });
 
   pi.registerTool({
@@ -399,10 +365,7 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
       feature_id: Type.Optional(Type.String({ description: 'Filter to feature and descendants' })),
       limit: Type.Optional(Type.Number({ description: 'Max entries. Default 20.' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleGetProjectHistory(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleGetProjectHistory),
   });
 
   pi.registerTool({
@@ -412,10 +375,7 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
     parameters: Type.Object({
       directory_path: Type.String({ description: 'Absolute path to the project directory to analyze' }),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleGenerateFeatureTree(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleGenerateFeatureTree),
   });
 
   pi.registerTool({
@@ -425,10 +385,7 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleSync(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleSync),
   });
 }
 
@@ -444,10 +401,7 @@ function registerVersionTools(pi: ExtensionAPI, client: ManifestClient): void {
     parameters: Type.Object({
       project_id: Type.String({ description: 'Project UUID' }),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleListVersions(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleListVersions),
   });
 
   pi.registerTool({
@@ -459,10 +413,7 @@ function registerVersionTools(pi: ExtensionAPI, client: ManifestClient): void {
       name: Type.String({ description: "Version name (e.g., '0.2.0')" }),
       description: Type.Optional(Type.String({ description: 'Version description' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleCreateVersion(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleCreateVersion),
   });
 
   pi.registerTool({
@@ -471,12 +422,9 @@ function registerVersionTools(pi: ExtensionAPI, client: ManifestClient): void {
     label: 'Assign a Manifest feature to a version',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID' }),
-      version_id: Type.Union([Type.String(), Type.Null()], { description: 'Version UUID or null to unassign' }),
+      version_id: Type.Optional(Type.String({ description: 'Version UUID to assign. Omit to unassign.' })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleSetFeatureVersion(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleSetFeatureVersion),
   });
 
   pi.registerTool({
@@ -486,10 +434,7 @@ function registerVersionTools(pi: ExtensionAPI, client: ManifestClient): void {
     parameters: Type.Object({
       version_id: Type.String({ description: 'Version UUID' }),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleReleaseVersion(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleReleaseVersion),
   });
 }
 
@@ -506,10 +451,7 @@ function registerVerificationTools(pi: ExtensionAPI, client: ManifestClient): vo
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
       commit_range: Type.Optional(Type.String({ description: "Git commit range (e.g., 'abc123..HEAD')" })),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleVerifyFeature(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleVerifyFeature),
   });
 
   pi.registerTool({
@@ -525,10 +467,7 @@ function registerVerificationTools(pi: ExtensionAPI, client: ManifestClient): vo
         file: Type.Optional(Type.String({ description: 'Affected file path' })),
       }), { description: 'Verification comments (empty = passed)' }),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleRecordVerification(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleRecordVerification),
   });
 
   pi.registerTool({
@@ -538,9 +477,6 @@ function registerVerificationTools(pi: ExtensionAPI, client: ManifestClient): vo
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
     }),
-    async execute(_id: string, params: any) {
-      const text = await handleGetFeatureProof(client, params);
-      return toolResult(text);
-    },
+    execute: createExecuteHandler(client, handleGetFeatureProof),
   });
 }

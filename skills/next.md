@@ -43,5 +43,5 @@ If no feature is found:
 No workable features found.
 
 All features are either implemented or there are no features yet.
-Use /tree to see the current state.
+Use /features to see the current state.
 ```

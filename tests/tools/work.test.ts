@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ManifestClient, ConflictError } from '../../src/client.js';
 import {
   handleStartFeature,
+  handleAssessPlan,
   handleUpdateFeature,
   handleProveFeature,
   handleCompleteFeature,
@@ -10,6 +11,7 @@ import {
 function createMockClient(): ManifestClient {
   return {
     startFeature: vi.fn(),
+    getFeatureContext: vi.fn(),
     updateFeature: vi.fn(),
     proveFeature: vi.fn(),
     completeFeature: vi.fn(),
@@ -71,6 +73,31 @@ describe('work tools', () => {
         details: 'Updated details',
       });
       expect(result).toContain('Updated');
+    });
+  });
+
+  describe('handleAssessPlan', () => {
+    it('grades a medium plan as tracked', async () => {
+      (client.getFeatureContext as any).mockResolvedValue({
+        id: '1',
+        display_id: 'MAN-1',
+        title: 'OAuth Login',
+        details: `As a user, I can sign in.
+
+- [ ] Accept valid credentials
+- [ ] Reject invalid credentials
+- [ ] Show an auth error`,
+      });
+
+      const result = await handleAssessPlan(client, {
+        feature_id: '1',
+        plan: 'Plan:\n1. Add auth tests\n2. Update the sign-in handler\n3. Record proof and completion state',
+      });
+
+      expect(client.getFeatureContext).toHaveBeenCalledWith('1');
+      expect(result).toContain('Plan assessment: tracked');
+      expect(result).toContain('Steps: 3');
+      expect(result).toContain('Unchecked acceptance criteria: 3');
     });
   });
 

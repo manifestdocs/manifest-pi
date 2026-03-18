@@ -27,7 +27,7 @@ const DESTRUCTIVE_PATTERNS = [
   /\bpip\s+(install|uninstall)/i,
   /\bapt(-get)?\s+(install|remove|purge|update|upgrade)/i,
   /\bbrew\s+(install|uninstall|upgrade)/i,
-  /\bgit\s+(add|commit|push|pull|merge|rebase|reset|checkout|branch\s+-[dD]|stash|cherry-pick|revert|tag|init|clone)/i,
+  /\bgit\s+(add|commit|push|pull|merge|rebase|reset|checkout\s+(?!-[bB])|branch\s+-[dD]|stash|cherry-pick|revert|tag|init|clone)/i,
   /\bsudo\b/i,
   /\bsu\b/i,
   /\bkill\b/i,
@@ -78,6 +78,7 @@ const SAFE_PATTERNS = [
   /^\s*htop\b/,
   /^\s*free\b/,
   /^\s*git\s+(status|log|diff|show|branch|remote|config\s+--get)/i,
+  /^\s*git\s+(checkout\s+-[bB]|switch\s+-c)\b/i,
   /^\s*git\s+ls-/i,
   /^\s*npm\s+(list|ls|view|info|search|outdated|audit)/i,
   /^\s*yarn\s+(list|info|why|audit)/i,
@@ -126,8 +127,8 @@ export function cleanStepText(text: string): string {
   if (cleaned.length > 0) {
     cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   }
-  if (cleaned.length > 50) {
-    cleaned = `${cleaned.slice(0, 47)}...`;
+  if (cleaned.length > 72) {
+    cleaned = `${cleaned.slice(0, 69)}...`;
   }
   return cleaned;
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Overview
 
-`@manifest/pi` is a Pi coding agent package that integrates Manifest feature management tools. It calls the Manifest HTTP API directly via `fetch()` — no MCP protocol layer.
+`@manifestdocs/pi` is a Pi coding agent package that integrates Manifest feature management tools. It calls the Manifest HTTP API directly via `fetch()` — no MCP protocol layer.
 
 ## Build & Test
 
@@ -22,10 +22,10 @@ pnpm check                      # Type-check without emitting
 - **`src/client.ts`** — HTTP client wrapping fetch() with typed methods
 - **`src/format.ts`** — Text rendering (trees, tables, state symbols, time buckets)
 - **`src/tools/*.ts`** — Tool definitions using TypeBox schemas, registered via `pi.registerTool()`
-- **`extensions/manifest.ts`** — Entry point: creates client, registers all tools
+- **`src/feature-workflow.ts`** — Main extension implementation
+- **`extensions/feature-workflow.ts`** — Thin Pi entrypoint shim re-exporting the compiled extension
 - **`skills/*.md`** — Workflow scripts (ported from manifest-plugin)
 - **`prompts/manifest.md`** — System instructions for agents
-- **`agents/product-engineer.md`** — Product engineer agent definition
 
 ## Conventions
 

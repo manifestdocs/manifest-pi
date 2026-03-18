@@ -28,11 +28,18 @@ describe('isSafeCommand', () => {
     expect(isSafeCommand('vitest run')).toBe(true);
   });
 
+  it('allows branch creation in plan mode', () => {
+    expect(isSafeCommand('git checkout -b feature/my-branch')).toBe(true);
+    expect(isSafeCommand('git checkout -B feature/my-branch')).toBe(true);
+    expect(isSafeCommand('git switch -c feature/my-branch')).toBe(true);
+  });
+
   it('blocks destructive commands', () => {
     expect(isSafeCommand('rm -rf /')).toBe(false);
     expect(isSafeCommand('mv file.txt /tmp/')).toBe(false);
     expect(isSafeCommand('git commit -m "test"')).toBe(false);
     expect(isSafeCommand('git push origin main')).toBe(false);
+    expect(isSafeCommand('git checkout main')).toBe(false);
     expect(isSafeCommand('npm install express')).toBe(false);
     expect(isSafeCommand('pnpm add lodash')).toBe(false);
   });
@@ -65,9 +72,9 @@ describe('cleanStepText', () => {
   });
 
   it('truncates long text', () => {
-    const long = 'A'.repeat(60);
+    const long = 'A'.repeat(80);
     const result = cleanStepText(long);
-    expect(result.length).toBe(50);
+    expect(result.length).toBe(72);
     expect(result.endsWith('...')).toBe(true);
   });
 

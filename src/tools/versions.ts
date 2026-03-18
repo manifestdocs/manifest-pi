@@ -74,7 +74,7 @@ export async function handleCreateVersion(
 
 interface SetFeatureVersionParams {
   feature_id: string;
-  version_id: string | null;
+  version_id?: string;
 }
 
 export async function handleSetFeatureVersion(
@@ -82,11 +82,12 @@ export async function handleSetFeatureVersion(
   params: SetFeatureVersionParams,
 ): Promise<string> {
   try {
-    await client.setFeatureVersion(params.feature_id, params.version_id);
-    if (params.version_id === null) {
+    const versionId = params.version_id ?? null;
+    await client.setFeatureVersion(params.feature_id, versionId);
+    if (versionId === null) {
       return `Unassigned feature ${params.feature_id} from version (now in backlog)`;
     }
-    return `Assigned feature ${params.feature_id} to version ${params.version_id}`;
+    return `Assigned feature ${params.feature_id} to version ${versionId}`;
   } catch (err) {
     if (err instanceof ApiError) {
       return `Error (${err.status}): ${err.body}`;

@@ -30,7 +30,7 @@ The `manifest_start_feature` tool records that work is beginning and returns the
 
    **If $ARGUMENTS is provided:**
    - Call `manifest_find_features` with `project_id` and `query` set to `$ARGUMENTS`
-   - If no matches, tell the user and suggest `/tree`
+   - If no matches, tell the user and suggest `/features`
    - If multiple matches, list them and ask which one
 
    **If $ARGUMENTS is blank:**

@@ -31,12 +31,12 @@ describe('ManifestClient', () => {
   });
 
   describe('constructor', () => {
-    it('defaults baseUrl to localhost:17010', () => {
+    it('defaults baseUrl to localhost:4242', () => {
       const client = new ManifestClient();
       mockFetch.mockResolvedValueOnce(jsonResponse([]));
       client.listProjects();
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/projects',
+        'http://localhost:4242/api/v1/projects',
         expect.any(Object),
       );
     });
@@ -121,7 +121,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse([]));
       await client.listProjects();
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/projects',
+        'http://localhost:4242/api/v1/projects',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -138,7 +138,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: '123' }));
       await client.getFeatureContext('123');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/features/123/context',
+        'http://localhost:4242/api/v1/features/123/context',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -147,7 +147,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: '123' }));
       await client.getFeature('123');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/features/123',
+        'http://localhost:4242/api/v1/features/123',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -156,7 +156,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: '123' }));
       await client.startFeature('123', { agent_type: 'pi' });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/features/123/claim');
+      expect(url).toBe('http://localhost:4242/api/v1/features/123/claim');
       expect(opts.method).toBe('PUT');
     });
 
@@ -164,7 +164,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: '123' }));
       await client.completeFeature('123', { summary: 'Done', commits: [] });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/features/123/complete');
+      expect(url).toBe('http://localhost:4242/api/v1/features/123/complete');
       expect(opts.method).toBe('POST');
     });
 
@@ -175,7 +175,7 @@ describe('ManifestClient', () => {
         exit_code: 0,
       });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/features/123/proofs');
+      expect(url).toBe('http://localhost:4242/api/v1/features/123/proofs');
       expect(opts.method).toBe('POST');
     });
 
@@ -183,7 +183,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'new' }));
       await client.createFeature('proj-1', { title: 'New' });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/projects/proj-1/features');
+      expect(url).toBe('http://localhost:4242/api/v1/projects/proj-1/features');
       expect(opts.method).toBe('POST');
     });
 
@@ -191,7 +191,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: '123' }));
       await client.updateFeature('123', { details: 'Updated' });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/features/123');
+      expect(url).toBe('http://localhost:4242/api/v1/features/123');
       expect(opts.method).toBe('PUT');
     });
 
@@ -199,7 +199,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse([]));
       await client.getFeatureTree('proj-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/projects/proj-1/features/tree',
+        'http://localhost:4242/api/v1/projects/proj-1/features/tree',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -216,7 +216,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ versions: [] }));
       await client.listVersions('proj-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/projects/proj-1/versions',
+        'http://localhost:4242/api/v1/projects/proj-1/versions',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -225,7 +225,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse([]));
       await client.getFeatureHistory('feat-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/features/feat-1/history',
+        'http://localhost:4242/api/v1/features/feat-1/history',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -234,7 +234,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: '1' }));
       await client.getNextFeature('proj-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/projects/proj-1/features/next',
+        'http://localhost:4242/api/v1/projects/proj-1/features/next',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -248,7 +248,7 @@ describe('ManifestClient', () => {
       } as Response);
       await client.deleteFeature('feat-1');
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/features/feat-1');
+      expect(url).toBe('http://localhost:4242/api/v1/features/feat-1');
       expect(opts.method).toBe('DELETE');
     });
 
@@ -256,7 +256,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'v1' }));
       await client.createVersion('proj-1', { name: '0.1.0' });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/projects/proj-1/versions');
+      expect(url).toBe('http://localhost:4242/api/v1/projects/proj-1/versions');
       expect(opts.method).toBe('POST');
     });
 
@@ -264,7 +264,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.setFeatureVersion('feat-1', 'ver-1');
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/features/feat-1/version');
+      expect(url).toBe('http://localhost:4242/api/v1/features/feat-1/version');
       expect(opts.method).toBe('PUT');
     });
 
@@ -272,7 +272,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.releaseVersion('ver-1');
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/versions/ver-1/release');
+      expect(url).toBe('http://localhost:4242/api/v1/versions/ver-1/release');
       expect(opts.method).toBe('POST');
     });
 
@@ -280,7 +280,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse([]));
       await client.getProjectHistory('proj-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/projects/proj-1/history',
+        'http://localhost:4242/api/v1/projects/proj-1/history',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -289,7 +289,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.getFeatureProof('feat-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/features/feat-1/proofs/latest',
+        'http://localhost:4242/api/v1/features/feat-1/proofs/latest',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -298,7 +298,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'proj-1' }));
       await client.initProject({ directory_path: '/my/path' });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/projects');
+      expect(url).toBe('http://localhost:4242/api/v1/projects');
       expect(opts.method).toBe('POST');
     });
 
@@ -306,7 +306,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'dir-1' }));
       await client.addProjectDirectory('proj-1', { path: '/new/path' });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/projects/proj-1/directories');
+      expect(url).toBe('http://localhost:4242/api/v1/projects/proj-1/directories');
       expect(opts.method).toBe('POST');
     });
 
@@ -314,7 +314,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ proposed_features: [] }));
       await client.planFeatures('proj-1', { features: [], confirm: false });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/projects/proj-1/features/plan');
+      expect(url).toBe('http://localhost:4242/api/v1/projects/proj-1/features/plan');
       expect(opts.method).toBe('POST');
     });
 
@@ -322,7 +322,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.verifyFeature('feat-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:17010/api/v1/features/feat-1/verify',
+        'http://localhost:4242/api/v1/features/feat-1/verify',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -331,7 +331,7 @@ describe('ManifestClient', () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.recordVerification('feat-1', { comments: [] });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:17010/api/v1/features/feat-1/verification');
+      expect(url).toBe('http://localhost:4242/api/v1/features/feat-1/verification');
       expect(opts.method).toBe('POST');
     });
 

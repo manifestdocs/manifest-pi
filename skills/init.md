@@ -30,7 +30,7 @@ Initialize Manifest for a new or existing codebase. Adapts the flow based on pro
 - If a project is found, tell the user:
   ```
   This directory is already linked to project "[Name]".
-  Use /tree to see features or /decompose to add new ones.
+  Use /features to see features or /decompose to add new ones.
   ```
 - Exit early if already initialized
 - If no project found for this directory, call `manifest_list_projects` (no filter) to check for existing projects
@@ -45,14 +45,15 @@ Initialize Manifest for a new or existing codebase. Adapts the flow based on pro
 - If the user picks an existing project, call `manifest_add_project_directory` with `project_id` and `path` set to the current working directory, then exit early with:
   ```
   Linked [directory] to project "[Name]".
-  Use /tree to see features.
+  Use /features to see features.
   ```
 
 ### 2. Analyze and create project
 
 - Call `manifest_init_project` with `directory_path` set to the current working directory and `skip_default_versions` set to `true`
 - This creates the project, links the directory, and returns analysis with size signals
-- After project creation, call `manifest_get_project_instructions` with the project ID to get the root feature
+- After project creation, call `manifest_find_features` with the new project ID and `state: "implemented"` to locate the root feature created for the project
+- Call `manifest_get_feature` with `view="full"` on that root feature to confirm you're updating the root node that carries project-wide context
 - Call `manifest_update_feature` on the root feature to set `details` to coding guidelines adapted from the template below
 - **Adapt the guidelines to the project's language and framework.** Keep the same structure and principles, but make examples and conventions language-native. For example:
   - Python: mention type hints, `pytest`, PEP 8, virtual environments
@@ -227,7 +228,7 @@ Versions created:
 
 Next steps:
 - /decompose to design your feature tree
-- /tree to see what exists
+- /features to see what exists
 ```
 
 ### 6. Handoff to decompose

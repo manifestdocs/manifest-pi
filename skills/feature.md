@@ -21,11 +21,11 @@ Search for and display feature details.
 2. Find the feature:
 
    **If $ARGUMENTS is blank:**
-   - Tell the user to provide a search query or use `/tree` to browse features
+   - Tell the user to provide a search query or use `/features` to browse features
 
    **If $ARGUMENTS is provided:**
    - Call `manifest_find_features` with `project_id` and `query` set to `$ARGUMENTS`
-   - If no matches found, tell the user and suggest checking spelling or using `/tree`
+   - If no matches found, tell the user and suggest checking spelling or using `/features`
 
 3. If multiple matches, list them and ask which one:
 

@@ -8,6 +8,7 @@
 
 import type { ExtensionAPI, ExtensionContext } from '@mariozechner/pi-coding-agent';
 import type { TodoItem } from './plan-utils.js';
+import type { PlanTier } from './tier.js';
 
 // ── State ────────────────────────────────────────
 
@@ -23,7 +24,6 @@ export const MANIFEST_READ_TOOLS = [
   'manifest_get_next_feature',
   'manifest_render_feature_tree',
   'manifest_orient',
-  'manifest_get_project_instructions',
   'manifest_get_project_history',
   'manifest_get_feature_proof',
   'manifest_list_versions',
@@ -43,22 +43,31 @@ export interface PlanModeController {
   getState(): PlanModeState;
   getTodoItems(): TodoItem[];
   setTodoItems(items: TodoItem[]): void;
+  getResolvedTier(): PlanTier | null;
+  setResolvedTier(tier: PlanTier): void;
   enter(pi: ExtensionAPI, ctx?: ExtensionContext): void;
   enterExecute(pi: ExtensionAPI, ctx?: ExtensionContext): void;
   exit(pi: ExtensionAPI, ctx?: ExtensionContext): void;
+  refreshDisplay(ctx: ExtensionContext): void;
   reset(): void;
 }
 
 export function createPlanModeController(): PlanModeController {
   let state: PlanModeState = 'normal';
   let todoItems: TodoItem[] = [];
+  let resolvedTier: PlanTier | null = null;
 
   function updateStatus(ctx: ExtensionContext | undefined): void {
     if (!ctx) return;
 
     if (state === 'execute' && todoItems.length > 0) {
       const completed = todoItems.filter((t) => t.completed).length;
-      ctx.ui.setStatus('plan-mode', ctx.ui.theme.fg('accent', `${completed}/${todoItems.length}`));
+      const counter = ctx.ui.theme.fg('accent', `${completed}/${todoItems.length}`);
+      if (resolvedTier === 'full') {
+        ctx.ui.setStatus('plan-mode', `${ctx.ui.theme.fg('warning', 'PLAN')} ${counter}`);
+      } else {
+        ctx.ui.setStatus('plan-mode', counter);
+      }
     } else if (state === 'plan') {
       ctx.ui.setStatus('plan-mode', ctx.ui.theme.fg('warning', 'PLAN'));
     } else {
@@ -93,9 +102,18 @@ export function createPlanModeController(): PlanModeController {
       todoItems = items;
     },
 
+    getResolvedTier() {
+      return resolvedTier;
+    },
+
+    setResolvedTier(tier: PlanTier) {
+      resolvedTier = tier;
+    },
+
     enter(pi: ExtensionAPI, ctx?: ExtensionContext) {
       state = 'plan';
       todoItems = [];
+      resolvedTier = null;
       pi.setActiveTools(getPlanModeTools());
       updateStatus(ctx);
     },
@@ -112,6 +130,7 @@ export function createPlanModeController(): PlanModeController {
     exit(pi: ExtensionAPI, ctx?: ExtensionContext) {
       state = 'normal';
       todoItems = [];
+      resolvedTier = null;
       const allTools = pi.getAllTools().map((t) => t.name);
       if (allTools.length > 0) {
         pi.setActiveTools(allTools);
@@ -119,9 +138,14 @@ export function createPlanModeController(): PlanModeController {
       updateStatus(ctx);
     },
 
+    refreshDisplay(ctx: ExtensionContext) {
+      updateStatus(ctx);
+    },
+
     reset() {
       state = 'normal';
       todoItems = [];
+      resolvedTier = null;
     },
   };
 }

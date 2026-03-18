@@ -4,6 +4,14 @@
 
 import type { ManifestClient } from '../client.js';
 import { ApiError, ConflictError, ConnectionError } from '../client.js';
+import type {
+  FeatureListItem,
+  FeatureWithContext,
+  InProgressFeatureResponse,
+  ProjectLookupResult,
+  Project,
+  ProjectHistoryEntry,
+} from '../types.js';
 import { renderTree, filterTree, stateSymbol, markdownTable, lodBreadcrumb, renderFeatureCard } from '../format.js';
 
 // ============================================================
@@ -20,22 +28,21 @@ export async function handleListProjects(
 ): Promise<string> {
   try {
     if (params.directory_path) {
-      const resp = await client.listProjectsByDirectory(params.directory_path) as any;
-      if (!resp || (!resp.id && (!resp.project || !resp.project.id))) return 'No projects found.';
-      const project = resp.project ?? resp;
+      const project = resolveProject(await client.listProjectsByDirectory(params.directory_path));
+      if (!project) return 'No projects found.';
       return formatProjectSummary(project);
     }
     const projects = await client.listProjects();
     if (projects.length === 0) return 'No projects found.';
     if (projects.length === 1) return formatProjectSummary(projects[0]);
-    const rows = projects.map((p: any) => [p.id, p.name, p.description ?? '']);
+    const rows = projects.map((project) => [project.id, project.name, project.description ?? '']);
     return markdownTable(['ID', 'Name', 'Description'], rows);
   } catch (err) {
     return handleError(err);
   }
 }
 
-function formatProjectSummary(project: any): string {
+function formatProjectSummary(project: Project): string {
   const parts: string[] = [];
   parts.push(`Project: ${project.name}`);
   parts.push(`ID: ${project.id}`);
@@ -63,15 +70,15 @@ export async function handleFindFeatures(
   params: FindFeaturesParams,
 ): Promise<string> {
   try {
-    const features = await client.findFeatures(params) as any[];
+    const features = await client.findFeatures(params);
     if (!features || features.length === 0) return 'No features found.';
 
-    const rows = features.map((f: any) => [
-      f.display_id ?? f.id.slice(0, 8),
-      f.id,
-      stateSymbol(f.state),
-      String(f.priority),
-      f.title,
+    const rows = features.map((feature: FeatureListItem) => [
+      feature.display_id ?? feature.id.slice(0, 8),
+      feature.id,
+      stateSymbol(feature.state),
+      String(feature.priority),
+      feature.title,
     ]);
     return markdownTable(['ID', 'UUID', 'State', 'P', 'Title'], rows);
   } catch (err) {
@@ -94,85 +101,85 @@ export async function handleGetFeature(
   params: GetFeatureParams,
 ): Promise<string> {
   try {
-  const ctx = await client.getFeatureContext(params.feature_id);
-  const view = params.view ?? 'card';
+    const ctx = await client.getFeatureContext(params.feature_id);
+    const view = params.view ?? 'card';
 
-  // Card view — compact, pre-formatted, ready for direct display
-  if (view === 'card') {
-    return renderFeatureCard(ctx);
-  }
+    // Card view — compact, pre-formatted, ready for direct display
+    if (view === 'card') {
+      return renderFeatureCard(ctx);
+    }
 
-  // Full view — includes breadcrumb context, siblings, and optional history
-  const parts: string[] = [];
+    // Full view — includes breadcrumb context, siblings, and optional history
+    const parts: string[] = [];
 
-  // Header
-  parts.push(`Feature: '${ctx.title}' (${ctx.state})`);
-  if (ctx.display_id) parts.push(`Display ID: ${ctx.display_id}`);
-  parts.push(`ID: ${ctx.id}`);
-  parts.push(`Priority: ${ctx.priority}`);
-  if (ctx.parent) parts.push(`Parent: ${ctx.parent.title}`);
+    // Header
+    parts.push(`Feature: '${ctx.title}' (${ctx.state})`);
+    if (ctx.display_id) parts.push(`Display ID: ${ctx.display_id}`);
+    parts.push(`ID: ${ctx.id}`);
+    parts.push(`Priority: ${ctx.priority}`);
+    if (ctx.parent) parts.push(`Parent: ${ctx.parent.title}`);
 
-  // Breadcrumb context
-  if (ctx.breadcrumb.length > 0) {
-    const budgeted = lodBreadcrumb(ctx.breadcrumb);
-    const withDetails = budgeted.filter((b) => b.details);
-    if (withDetails.length > 0) {
-      parts.push('');
-      parts.push('## Ancestor Context');
-      for (const item of withDetails) {
-        parts.push(`### ${item.title}`);
-        parts.push(item.details!);
+    // Breadcrumb context
+    if (ctx.breadcrumb.length > 0) {
+      const budgeted = lodBreadcrumb(ctx.breadcrumb);
+      const withDetails = budgeted.filter((b) => b.details);
+      if (withDetails.length > 0) {
+        parts.push('');
+        parts.push('## Ancestor Context');
+        for (const item of withDetails) {
+          parts.push(`### ${item.title}`);
+          parts.push(item.details!);
+        }
       }
     }
-  }
 
-  // Details
-  if (ctx.details) {
-    parts.push('');
-    parts.push('## Details');
-    parts.push(ctx.details);
-  }
-
-  // Desired details (change request)
-  if (ctx.desired_details) {
-    parts.push('');
-    parts.push('## Desired Changes');
-    parts.push(ctx.desired_details);
-  }
-
-  // Children
-  if (ctx.children.length > 0) {
-    parts.push('');
-    parts.push('## Children');
-    for (const child of ctx.children) {
-      const cid = child.display_id ?? child.id?.slice(0, 8) ?? '';
-      parts.push(`  ${stateSymbol(child.state)} ${cid} ${child.title}`);
-    }
-  }
-
-  // Siblings
-  if (ctx.siblings.length > 0) {
-    parts.push('');
-    parts.push('## Siblings');
-    for (const sib of ctx.siblings) {
-      const sid = sib.display_id ?? sib.id?.slice(0, 8) ?? '';
-      parts.push(`  ${stateSymbol(sib.state)} ${sid} ${sib.title}`);
-    }
-  }
-
-  // History
-  if (params.include_history) {
-    const history = await client.getFeatureHistory(params.feature_id);
-    if (history.length > 0) {
+    // Details
+    if (ctx.details) {
       parts.push('');
-      parts.push('## History');
-      for (const entry of history) {
-        parts.push(`- ${entry.created_at}: ${entry.summary}`);
+      parts.push('## Details');
+      parts.push(ctx.details);
+    }
+
+    // Desired details (change request)
+    if (ctx.desired_details) {
+      parts.push('');
+      parts.push('## Desired Changes');
+      parts.push(ctx.desired_details);
+    }
+
+    // Children
+    if (ctx.children.length > 0) {
+      parts.push('');
+      parts.push('## Children');
+      for (const child of ctx.children) {
+        const childId = child.display_id ?? child.id?.slice(0, 8) ?? '';
+        parts.push(`  ${stateSymbol(child.state)} ${childId} ${child.title}`);
       }
     }
-  }
 
-  return parts.join('\n');
+    // Siblings
+    if (ctx.siblings.length > 0) {
+      parts.push('');
+      parts.push('## Siblings');
+      for (const sibling of ctx.siblings) {
+        const siblingId = sibling.display_id ?? sibling.id?.slice(0, 8) ?? '';
+        parts.push(`  ${stateSymbol(sibling.state)} ${siblingId} ${sibling.title}`);
+      }
+    }
+
+    // History
+    if (params.include_history) {
+      const history = await client.getFeatureHistory(params.feature_id);
+      if (history.length > 0) {
+        parts.push('');
+        parts.push('## History');
+        for (const entry of history) {
+          parts.push(`- ${entry.created_at}: ${entry.summary}`);
+        }
+      }
+    }
+
+    return parts.join('\n');
   } catch (err) {
     return handleError(err);
   }
@@ -195,7 +202,7 @@ export async function handleGetNextFeature(
   try {
     const projectId = await resolveProjectId(client, params);
     if (!projectId) return 'No project found. Pass project_id or directory_path.';
-    const result = await client.getNextFeature(projectId, params.version_id) as any;
+    const result = await client.getNextFeature(projectId, params.version_id);
     if (!result || !result.id) return 'No workable features found.';
     return formatFeatureSummary(result);
   } catch (err) {
@@ -208,35 +215,36 @@ export async function handleGetNextFeature(
 
 function formatStaleFeatures(body: string): string {
   try {
-    let data = JSON.parse(body);
+    let data: unknown = JSON.parse(body);
     // Handle double-encoded JSON (older server versions)
-    if (typeof data.error === 'string' && data.error.startsWith('{')) {
+    if (isWrappedError(data) && typeof data.error === 'string' && data.error.startsWith('{')) {
       data = JSON.parse(data.error);
     }
-    const features = data.features ?? [];
-    const completable = features.filter((f: any) => f.completable);
-    const stalled = features.filter((f: any) => !f.completable);
+    if (!isInProgressFeatureResponse(data)) return body;
+    const features = data.features;
+    const completable = features.filter((feature) => feature.completable);
+    const stalled = features.filter((feature) => !feature.completable);
     const parts: string[] = [];
     parts.push(`## ${features.length} feature(s) still in progress\n`);
 
     if (completable.length > 0) {
       parts.push(`### Ready to complete (${completable.length})\n`);
       parts.push('These have passing proofs -- call manifest_complete_feature with a summary and commit SHAs:\n');
-      for (const f of completable) {
-        const id = f.display_id ?? f.id?.slice(0, 8);
-        parts.push(`- ${id} ${f.title} [proof passed ${f.proof_status?.created_at ?? ''}]`);
+      for (const feature of completable) {
+        const id = feature.display_id ?? feature.id.slice(0, 8);
+        parts.push(`- ${id} ${feature.title} [proof passed ${feature.proof_status?.created_at ?? ''}]`);
       }
     }
 
     if (stalled.length > 0) {
       if (completable.length > 0) parts.push('');
       parts.push(`### Still needs work (${stalled.length})\n`);
-      for (const f of stalled) {
-        const id = f.display_id ?? f.id?.slice(0, 8);
-        const proofNote = f.proof_status
-          ? ` [proof failed, exit_code=${f.proof_status.exit_code}]`
+      for (const feature of stalled) {
+        const id = feature.display_id ?? feature.id.slice(0, 8);
+        const proofNote = feature.proof_status
+          ? ` [proof failed, exit_code=${feature.proof_status.exit_code}]`
           : ' [no proof recorded]';
-        parts.push(`- ${id} ${f.title}${proofNote}`);
+        parts.push(`- ${id} ${feature.title}${proofNote}`);
       }
     }
 
@@ -308,8 +316,7 @@ export async function handleOrient(
     let projectId = params.project_id;
     let projectName = '';
     if (!projectId && params.directory_path) {
-      const resp = await client.listProjectsByDirectory(params.directory_path) as any;
-      const project = resp?.project ?? resp;
+      const project = resolveProject(await client.listProjectsByDirectory(params.directory_path));
       if (project?.id) {
         projectId = project.id;
         projectName = project.name;
@@ -347,21 +354,19 @@ export async function handleOrient(
     }
 
     // Work queue
-    const proposedArr = proposed as any[];
-    if (Array.isArray(proposedArr) && proposedArr.length > 0) {
+    if (Array.isArray(proposed) && proposed.length > 0) {
       parts.push('');
       parts.push('## Next Up');
-      for (const f of proposedArr) {
-        parts.push(`  ${stateSymbol(f.state)} ${f.title}`);
+      for (const feature of proposed) {
+        parts.push(`  ${stateSymbol(feature.state)} ${feature.title}`);
       }
     }
 
     // Recent history
-    const historyArr = history as any[];
-    if (Array.isArray(historyArr) && historyArr.length > 0) {
+    if (Array.isArray(history) && history.length > 0) {
       parts.push('');
       parts.push('## Recent Activity');
-      for (const entry of historyArr) {
+      for (const entry of history) {
         const headline = (entry.summary ?? '').split('\n')[0].trim();
         parts.push(`  ${stateSymbol(entry.feature_state)} ${entry.feature_title} -- ${headline}`);
       }
@@ -384,8 +389,7 @@ async function resolveProjectId(
 ): Promise<string | null> {
   if (params.project_id) return params.project_id;
   if (!params.directory_path) return null;
-  const resp = await client.listProjectsByDirectory(params.directory_path) as any;
-  const project = resp?.project ?? resp;
+  const project = resolveProject(await client.listProjectsByDirectory(params.directory_path));
   return project?.id ?? null;
 }
 
@@ -399,13 +403,23 @@ function handleError(err: unknown): string {
   throw err;
 }
 
-function formatResponse(data: unknown): string {
-  if (typeof data === 'string') return data;
-  return JSON.stringify(data, null, 2);
+function resolveProject(result: ProjectLookupResult): Project | null {
+  if (result.project) return result.project;
+  if (!result.id) return null;
+  return result as Project;
+}
+
+function isWrappedError(value: unknown): value is { error?: string } {
+  return typeof value === 'object' && value !== null;
+}
+
+function isInProgressFeatureResponse(value: unknown): value is InProgressFeatureResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  return Array.isArray((value as InProgressFeatureResponse).features);
 }
 
 /** Format a feature response (from get_next, get_active, etc.) as structured text. */
-function formatFeatureSummary(feature: any): string {
+function formatFeatureSummary(feature: FeatureWithContext): string {
   const parts: string[] = [];
 
   // Header
@@ -418,7 +432,7 @@ function formatFeatureSummary(feature: any): string {
 
   // Breadcrumb path
   if (feature.breadcrumb?.length > 0) {
-    const path = feature.breadcrumb.map((b: any) => b.title).join(' > ');
+    const path = feature.breadcrumb.map((item) => item.title).join(' > ');
     parts.push(`Path: ${path}`);
   }
 
@@ -434,8 +448,7 @@ function formatFeatureSummary(feature: any): string {
     parts.push('');
     parts.push('## Children');
     for (const child of feature.children) {
-      const cid = child.display_id ?? child.id?.slice(0, 8) ?? '';
-      parts.push(`  ${stateSymbol(child.state)} ${cid} ${child.title}`);
+      parts.push(`  ${stateSymbol(child.state)} ${child.title}`);
     }
   }
 
@@ -443,9 +456,8 @@ function formatFeatureSummary(feature: any): string {
   if (feature.siblings?.length > 0) {
     parts.push('');
     parts.push('## Siblings');
-    for (const sib of feature.siblings) {
-      const sid = sib.display_id ?? sib.id?.slice(0, 8) ?? '';
-      parts.push(`  ${stateSymbol(sib.state)} ${sid} ${sib.title}`);
+    for (const sibling of feature.siblings) {
+      parts.push(`  ${stateSymbol(sibling.state)} ${sibling.title}`);
     }
   }
 

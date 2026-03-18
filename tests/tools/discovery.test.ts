@@ -61,7 +61,7 @@ describe('discovery tools', () => {
 
     it('returns connection error message when server is down', async () => {
       (client.listProjects as any).mockRejectedValue(
-        new ConnectionError('http://localhost:17010'),
+        new ConnectionError('http://localhost:4242'),
       );
 
       const result = await handleListProjects(client, {});
@@ -98,7 +98,7 @@ describe('discovery tools', () => {
 
     it('returns connection error when server is down', async () => {
       (client.findFeatures as any).mockRejectedValue(
-        new ConnectionError('http://localhost:17010'),
+        new ConnectionError('http://localhost:4242'),
       );
 
       const result = await handleFindFeatures(client, { project_id: 'proj-1' });
@@ -247,7 +247,7 @@ describe('discovery tools', () => {
 
     it('returns connection error when server is down', async () => {
       (client.getFeatureTree as any).mockRejectedValue(
-        new ConnectionError('http://localhost:17010'),
+        new ConnectionError('http://localhost:4242'),
       );
 
       const result = await handleRenderFeatureTree(client, { project_id: 'proj-1' });
@@ -306,7 +306,7 @@ describe('discovery tools', () => {
 
     it('returns connection error when server is down', async () => {
       (client.listProjectsByDirectory as any).mockRejectedValue(
-        new ConnectionError('http://localhost:17010'),
+        new ConnectionError('http://localhost:4242'),
       );
 
       const result = await handleOrient(client, { directory_path: '/my/project' });

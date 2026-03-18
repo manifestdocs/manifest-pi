@@ -25,7 +25,11 @@ export function registerGates(
   // -- tool_call: evaluate hard gates before execution --
   pi.on('tool_call', async (event: ToolCallEvent, _ctx: ExtensionContext) => {
     if (event.toolName === 'manifest_start_feature') {
-      const featureId = (event.input as any).feature_id as string;
+      const featureId =
+        typeof event.input.feature_id === 'string'
+          ? event.input.feature_id
+          : undefined;
+      if (!featureId) return undefined;
 
       // Team mode gate: block start unless spec approved
       const implDecision = evaluateReadyForImplementation(state, featureId);
@@ -35,8 +39,15 @@ export function registerGates(
     }
 
     if (event.toolName === 'manifest_complete_feature') {
-      const featureId = (event.input as any).feature_id as string;
-      const backfill = (event.input as any).backfill as boolean | undefined;
+      const featureId =
+        typeof event.input.feature_id === 'string'
+          ? event.input.feature_id
+          : undefined;
+      if (!featureId) return undefined;
+      const backfill =
+        typeof event.input.backfill === 'boolean'
+          ? event.input.backfill
+          : undefined;
 
       // Team mode gate: block complete unless reviewed + proved + verified
       const completionDecision = evaluateReadyForCompletion(state, featureId);
@@ -66,11 +77,20 @@ export function registerGates(
 
     // Track state transitions from successful tool results
     if (event.toolName === 'manifest_start_feature') {
-      const featureId = (event.input as any).feature_id;
+      const featureId =
+        typeof event.input.feature_id === 'string'
+          ? event.input.feature_id
+          : undefined;
+      if (!featureId) return undefined;
       state.featureStarted(featureId);
       if (state.teamMode) {
         state.advancePhase(featureId, 'implementing');
       }
+
+      // Store spec details for tier assessment
+      const resultText = event.content?.[0]?.type === 'text' ? event.content[0].text : '';
+      const specMatch = resultText.match(/## Specification\n([\s\S]*?)(?=\n## |$)/);
+      state.setActiveFeatureDetails(specMatch?.[1]?.trim() ?? null);
 
       // Auto-enter plan mode for code exploration before implementation
       if (planController && planController.getState() === 'normal') {
@@ -79,17 +99,31 @@ export function registerGates(
     }
 
     if (event.toolName === 'manifest_prove_feature') {
-      const exitCode = (event.input as any).exit_code;
-      const featureId = (event.input as any).feature_id;
+      const featureId =
+        typeof event.input.feature_id === 'string'
+          ? event.input.feature_id
+          : undefined;
+      const exitCode =
+        typeof event.input.exit_code === 'number'
+          ? event.input.exit_code
+          : undefined;
       if (exitCode === 0) {
+        if (!featureId) return undefined;
         state.featureProved(featureId);
       }
     }
 
     if (event.toolName === 'manifest_update_feature') {
-      const featureId = (event.input as any).feature_id;
-      const details = (event.input as any).details;
+      const featureId =
+        typeof event.input.feature_id === 'string'
+          ? event.input.feature_id
+          : undefined;
+      const details =
+        typeof event.input.details === 'string'
+          ? event.input.details
+          : undefined;
       if (details) {
+        if (!featureId) return undefined;
         state.featureSpecUpdated(featureId);
 
         // Team mode: check if spec passes quality gate → advance to spec_approved
@@ -106,22 +140,29 @@ export function registerGates(
     }
 
     if (event.toolName === 'manifest_record_verification') {
-      const featureId = (event.input as any).feature_id;
-      const comments = (event.input as any).comments;
+      const featureId =
+        typeof event.input.feature_id === 'string'
+          ? event.input.feature_id
+          : undefined;
+      const comments = event.input.comments;
       if (Array.isArray(comments) && comments.length === 0) {
+        if (!featureId) return undefined;
+        // No-op for phase: verification success only flips the verified flag.
         state.setVerified(featureId, true);
-        if (state.teamMode) {
-          // Verification passed — phase stays at reviewing, verified flag set
-        }
       }
     }
 
     if (event.toolName === 'manifest_complete_feature') {
-      const featureId = (event.input as any).feature_id;
+      const featureId =
+        typeof event.input.feature_id === 'string'
+          ? event.input.feature_id
+          : undefined;
+      if (!featureId) return undefined;
+      const wasTeamMode = state.teamMode;
       state.featureCompleted(featureId);
 
       // Restore all tools when exiting team mode after feature completion
-      if (state.teamMode) {
+      if (wasTeamMode) {
         const allTools = pi.getAllTools().map((t) => t.name);
         if (allTools.length > 0) {
           pi.setActiveTools(allTools);

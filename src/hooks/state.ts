@@ -21,6 +21,8 @@ export class WorkflowState {
   private features = new Map<string, FeatureWorkState>();
   private _currentFeatureId: string | null = null;
   private _teamMode = false;
+  private _activeFeatureDetails: string | null = null;
+  private _ancestorContext: string | null = null;
 
   get currentFeatureId(): string | null {
     return this._currentFeatureId;
@@ -28,6 +30,22 @@ export class WorkflowState {
 
   get teamMode(): boolean {
     return this._teamMode;
+  }
+
+  get activeFeatureDetails(): string | null {
+    return this._activeFeatureDetails;
+  }
+
+  setActiveFeatureDetails(details: string | null): void {
+    this._activeFeatureDetails = details;
+  }
+
+  get ancestorContext(): string | null {
+    return this._ancestorContext;
+  }
+
+  setAncestorContext(context: string | null): void {
+    this._ancestorContext = context;
   }
 
   hasActiveFeature(): boolean {
@@ -76,6 +94,8 @@ export class WorkflowState {
     if (this._currentFeatureId === featureId) {
       this._currentFeatureId = null;
       this._teamMode = false;
+      this._activeFeatureDetails = null;
+      this._ancestorContext = null;
     }
   }
 
@@ -112,5 +132,7 @@ export class WorkflowState {
     this.features.clear();
     this._currentFeatureId = null;
     this._teamMode = false;
+    this._activeFeatureDetails = null;
+    this._ancestorContext = null;
   }
 }

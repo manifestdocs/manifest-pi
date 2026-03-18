@@ -1,5 +1,5 @@
 ---
-name: tree
+name: features
 description: Show the project feature tree
 disable-model-invocation: true
 ---
@@ -16,12 +16,13 @@ Display the feature tree for the current project.
 2. Render the feature tree:
    - Call `manifest_render_feature_tree` with the project ID and `max_depth: 3`
 
-3. Display the tree output directly -- do NOT repeat or reformat it. The tool already returns formatted ASCII art.
+3. Display ONLY:
+   - The tree output exactly as returned (do not repeat, reformat, or wrap it)
+   - A one-line legend: `◇ proposed  ○ in_progress  ● implemented  ⊘ blocked  ✗ archived`
 
-4. After the tree, add a one-line legend:
-   `◇ proposed  ○ in_progress  ● implemented  ⊘ blocked  ✗ archived`
+   That's it. Nothing else. No narration before or after.
 
 ## Important
 
 - ALWAYS pass `directory_path` to `manifest_list_projects` for auto-discovery. Never list all projects and ask the user to pick.
-- Do NOT echo the tree a second time. The tool result IS the output.
+- Do NOT narrate what you are doing. No "Calling...", "Rendering...", "Here is...", or "Providing..." messages. The tree speaks for itself.

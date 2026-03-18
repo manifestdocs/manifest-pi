@@ -79,7 +79,7 @@ Complete work on the current in-progress feature.
      Want me to remember this choice for future features? (y/n)
      ```
 
-   - Save preference if requested (in CLAUDE.md or project instructions)
+   - Save preference if requested (in CLAUDE.md or the root feature details)
 
 7. **Execute git workflow:**
 
@@ -150,7 +150,7 @@ Recorded [N] commits in history.
 
 Store the user's git workflow preference so they don't have to answer every time:
 
-- Look for a comment in the project's CLAUDE.md or instructions:
+- Look for a comment in the project's CLAUDE.md or root feature details:
   ```
   <!-- manifest:git-workflow=merge -->
   ```

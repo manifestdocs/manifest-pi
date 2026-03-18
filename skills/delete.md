@@ -22,7 +22,7 @@ Permanently delete an archived feature.
 
 2. Find the feature:
    - Call `manifest_find_features` with `project_id` and `query` set to `$ARGUMENTS`
-   - If no matches, tell the user and suggest `/tree`
+   - If no matches, tell the user and suggest `/features`
    - If multiple matches, list them and ask which one
 
 3. Check the feature state:
