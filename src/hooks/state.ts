@@ -15,6 +15,7 @@ export interface FeatureWorkState {
   phase: WorkflowPhase;
   verified: boolean;
   dispatched: boolean;
+  claimedAt: string | null;
 }
 
 export class WorkflowState {
@@ -61,7 +62,7 @@ export class WorkflowState {
     this._teamMode = false;
   }
 
-  featureStarted(featureId: string): void {
+  featureStarted(featureId: string, claimedAt?: string): void {
     this._currentFeatureId = featureId;
     if (!this.features.has(featureId)) {
       this.features.set(featureId, {
@@ -71,6 +72,7 @@ export class WorkflowState {
         phase: 'speccing',
         verified: false,
         dispatched: false,
+        claimedAt: claimedAt ?? new Date().toISOString(),
       });
     }
   }

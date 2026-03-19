@@ -8,6 +8,8 @@ import { Type } from '@sinclair/typebox';
 import { StringEnum } from '@mariozechner/pi-ai';
 import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
 import type { ManifestClient } from '../client.js';
+import type { WorkflowState } from '../hooks/state.js';
+import { getCommitsSince } from '../hooks/git-commits.js';
 import {
   handleListProjects,
   handleFindFeatures,
@@ -80,9 +82,9 @@ export {
 /**
  * Register all Manifest tools with Pi.
  */
-export function registerAllTools(pi: ExtensionAPI, client: ManifestClient): void {
+export function registerAllTools(pi: ExtensionAPI, client: ManifestClient, state?: WorkflowState): void {
   registerDiscoveryTools(pi, client);
-  registerWorkTools(pi, client);
+  registerWorkTools(pi, client, state);
   registerSetupTools(pi, client);
   registerVersionTools(pi, client);
   registerVerificationTools(pi, client);
@@ -187,7 +189,7 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
 // Work Tools
 // ============================================================
 
-function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
+function registerWorkTools(pi: ExtensionAPI, client: ManifestClient, state?: WorkflowState): void {
   pi.registerTool({
     name: 'manifest_start_feature',
     description: 'Start work on a feature. Transitions to in_progress and records your claim. MUST be called before implementing.',
@@ -264,7 +266,7 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
 
   pi.registerTool({
     name: 'manifest_complete_feature',
-    description: 'Mark work as done. Records history with summary and commits, sets state to implemented.',
+    description: 'Mark work as done. Records history with summary and commits, sets state to implemented. Commits are auto-captured from git if not provided.',
     label: 'Complete a Manifest feature with summary and commits',
     parameters: Type.Object({
       feature_id: Type.String({ description: 'Feature UUID or display ID' }),
@@ -275,10 +277,32 @@ function registerWorkTools(pi: ExtensionAPI, client: ManifestClient): void {
           sha: Type.String({ description: 'Git commit SHA' }),
           message: Type.String({ description: 'Commit message' }),
         }),
-      ]), { description: 'Git commit SHAs or {sha, message} objects' }),
+      ]), { description: 'Git commit SHAs or {sha, message} objects. Auto-captured from git history if empty.' }),
       backfill: Type.Optional(Type.Boolean({ description: 'Skip proof/spec requirements. Default false.' })),
     }),
-    execute: createExecuteHandler(client, handleCompleteFeature),
+    execute: async (_id, params, _signal, _onUpdate, ctx) => {
+      const typedParams = params as {
+        feature_id: string;
+        summary: string;
+        commits: (string | { sha: string; message: string })[];
+        backfill?: boolean;
+      };
+
+      // Pre-completion hook: auto-capture git commits if none provided
+      if (typedParams.commits.length === 0 && state) {
+        const featureState = state.getFeatureState(typedParams.feature_id);
+        const claimedAt = featureState?.claimedAt;
+        if (claimedAt && ctx.cwd) {
+          const captured = await getCommitsSince(ctx.cwd, claimedAt);
+          if (captured.length > 0) {
+            typedParams.commits = captured.map((c) => ({ sha: c.sha, message: c.message }));
+          }
+        }
+      }
+
+      const text = await handleCompleteFeature(client, typedParams);
+      return toolResult(text);
+    },
   });
 }
 

@@ -24,7 +24,7 @@ describe('WorkflowState', () => {
     it('creates a work state entry with default phase', () => {
       state.featureStarted('f-1');
       const ws = state.getFeatureState('f-1');
-      expect(ws).toEqual({
+      expect(ws).toMatchObject({
         featureId: 'f-1',
         proved: false,
         specUpdated: false,
@@ -32,6 +32,8 @@ describe('WorkflowState', () => {
         verified: false,
         dispatched: false,
       });
+      expect(ws?.claimedAt).toBeDefined();
+      expect(typeof ws?.claimedAt).toBe('string');
     });
 
     it('switches current when starting a second feature', () => {

@@ -22,7 +22,7 @@ import type {
 } from '@mariozechner/pi-coding-agent';
 import { parseFrontmatter } from '@mariozechner/pi-coding-agent';
 import { ManifestClient } from './client.js';
-import { lodBreadcrumb } from './format.js';
+import { lodBreadcrumb, featureWebUrl } from './format.js';
 import { registerAllTools } from './tools/index.js';
 import { WorkflowState } from './hooks/state.js';
 import { registerGates } from './hooks/register.js';
@@ -175,7 +175,7 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
 
   const updatePromise = checkForUpdate();
 
-  registerAllTools(pi, client);
+  registerAllTools(pi, client, workflowState);
   registerGates(pi, workflowState, planController);
 
   pi.registerFlag('plan', {
@@ -329,7 +329,7 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
     }
   });
 
-  pi.on('tool_result', async (event: ToolResultEvent, _ctx: ExtensionContext) => {
+  pi.on('tool_result', async (event: ToolResultEvent, extCtx: ExtensionContext) => {
     if (event.isError) return;
 
     if (event.toolName === 'manifest_start_feature') {
@@ -347,23 +347,29 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
             workflowState.setAncestorContext(parts.join('\n\n'));
           }
         }
+        const url = featureWebUrl(client.webUrl, ctx.project_slug, ctx.display_id);
+        if (url && extCtx.hasUI) {
+          extCtx.ui.setStatus('feature-url', url);
+        }
       } catch {
         // Best effort — ancestor context is supplementary
       }
       return;
     }
 
-    if (
-      event.toolName === 'manifest_complete_feature' &&
-      planController.getState() === 'execute'
-    ) {
-      const todos = planController.getTodoItems();
-      for (const todo of todos) {
-        todo.completed = true;
+    if (event.toolName === 'manifest_complete_feature') {
+      if (extCtx.hasUI) {
+        extCtx.ui.setStatus('feature-url', undefined);
       }
-      planController.setTodoItems(todos);
-      completionSucceeded = true;
-      persistPlanState();
+      if (planController.getState() === 'execute') {
+        const todos = planController.getTodoItems();
+        for (const todo of todos) {
+          todo.completed = true;
+        }
+        planController.setTodoItems(todos);
+        completionSucceeded = true;
+        persistPlanState();
+      }
     }
   });
 
