@@ -30,7 +30,7 @@ export const MANIFEST_READ_TOOLS = [
 ];
 
 /** Pi built-in tools allowed in plan mode. */
-const PI_PLAN_TOOLS = ['read', 'bash', 'grep', 'find', 'ls', 'questionnaire'];
+const PI_PLAN_TOOLS = ['read', 'bash', 'grep', 'find', 'ls'];
 
 /** All tools available in plan mode (read-only). */
 export function getPlanModeTools(): string[] {

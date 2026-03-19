@@ -24,7 +24,6 @@ describe('getPlanModeTools', () => {
     expect(tools).toContain('grep');
     expect(tools).toContain('find');
     expect(tools).toContain('ls');
-    expect(tools).toContain('questionnaire');
     expect(tools).toContain('manifest_list_projects');
     expect(tools).toContain('manifest_get_feature');
     expect(tools).toContain('manifest_orient');
