@@ -159,9 +159,10 @@ Call `manifest_update_feature` on the project's root feature to set its details 
 - Project overview (1-2 sentences)
 - Tech stack and key dependencies
 - Architectural decisions and conventions
+- Language/framework coding guidelines: idioms, patterns, and conventions for the tech stack (e.g., async patterns, type safety approach, error handling style, import conventions, testing framework idioms). These guide every feature implementation.
 - Data model decisions resolved during Phase C (ID types, enum representations, naming conventions)
 - Integration rule: features that establish shared infrastructure (database, auth, caching, etc.) define the canonical implementation. Dependent features must use existing infrastructure, not create parallel implementations. If a database layer exists, endpoints use it -- no in-memory substitutes.
-- Any cross-cutting constraints (coding style, testing approach, directory structure)
+- Any other cross-cutting constraints (directory structure, CI requirements)
 
 Also provide `details_summary` (~200 words) so breadcrumbs stay concise.
 
