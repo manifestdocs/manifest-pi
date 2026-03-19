@@ -98,6 +98,8 @@ export class ManifestClient {
     this.apiKey = config?.apiKey;
   }
 
+  get webUrl(): string { return this.baseUrl; }
+
   private get apiUrl(): string {
     return `${this.baseUrl}/api/v1`;
   }
@@ -159,7 +161,7 @@ export class ManifestClient {
 
   async listProjectsByDirectory(directoryPath: string): Promise<ProjectLookupResult> {
     const encoded = encodeURIComponent(directoryPath);
-    return this.request('GET', `/projects/by-directory?path=${encoded}`);
+    return this.request('GET', `/projects?directory=${encoded}`);
   }
 
   async getProject(id: string): Promise<ProjectWithDirectories> {
@@ -218,7 +220,7 @@ export class ManifestClient {
   }
 
   async getFeatureTree(projectId: string): Promise<FeatureTreeNode[]> {
-    return this.request('GET', `/projects/${projectId}/features/tree`);
+    return this.request('GET', `/projects/${projectId}/features?format=tree`);
   }
 
   async findFeatures(params: {
@@ -240,8 +242,8 @@ export class ManifestClient {
   }
 
   async getNextFeature(projectId: string, versionId?: string): Promise<FeatureWithContext> {
-    let path = `/projects/${projectId}/features/next`;
-    if (versionId) path += `?version_id=${versionId}`;
+    let path = `/projects/${projectId}/features?next=true`;
+    if (versionId) path += `&version_id=${versionId}`;
     return this.request('GET', path);
   }
 
@@ -279,7 +281,7 @@ export class ManifestClient {
   }
 
   async getFeatureProof(featureId: string): Promise<FeatureProof> {
-    return this.request('GET', `/features/${featureId}/proofs/latest`);
+    return this.request('GET', `/features/${featureId}/proofs?latest=true`);
   }
 
   // ============================================================
@@ -301,7 +303,9 @@ export class ManifestClient {
   }
 
   async releaseVersion(versionId: string): Promise<unknown> {
-    return this.request('POST', `/versions/${versionId}/release`);
+    return this.request('PUT', `/versions/${versionId}`, {
+      released_at: new Date().toISOString(),
+    });
   }
 
   // ============================================================
@@ -316,7 +320,7 @@ export class ManifestClient {
       target_version_id?: string;
     },
   ): Promise<unknown> {
-    return this.request('POST', `/projects/${projectId}/features/plan`, input);
+    return this.request('POST', `/projects/${projectId}/features`, input);
   }
 
   // ============================================================
