@@ -6,6 +6,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext, ToolCallEvent, ToolResultEvent } from '@mariozechner/pi-coding-agent';
+import type { ManifestClient } from '../client.js';
 import type { WorkflowState } from './state.js';
 import type { PlanModeController } from './plan-mode.js';
 import {
@@ -20,6 +21,7 @@ import {
 export function registerGates(
   pi: ExtensionAPI,
   state: WorkflowState,
+  client: ManifestClient,
   planController?: PlanModeController,
 ): void {
   // -- tool_call: evaluate hard gates before execution --
@@ -49,16 +51,15 @@ export function registerGates(
           ? event.input.backfill
           : undefined;
 
-      // Team mode gate: block complete unless reviewed + proved + verified
-      const completionDecision = evaluateReadyForCompletion(state, featureId);
-      if (!completionDecision.allow) {
-        return { block: true, reason: completionDecision.reason };
-      }
-
       if (!backfill) {
         const proveDecision = evaluateMustProve(state, featureId);
         if (!proveDecision.allow) {
           return { block: true, reason: proveDecision.reason };
+        }
+
+        const completionDecision = evaluateReadyForCompletion(state, featureId);
+        if (!completionDecision.allow) {
+          return { block: true, reason: completionDecision.reason };
         }
 
         const specDecision = evaluateMustUpdateSpec(state, featureId);
@@ -83,8 +84,16 @@ export function registerGates(
           : undefined;
       if (!featureId) return undefined;
       state.featureStarted(featureId);
-      if (state.teamMode) {
-        state.advancePhase(featureId, 'implementing');
+      state.advancePhase(featureId, 'implementing');
+
+      // Hydrate proof/spec state from server (handles re-claims and cross-session resume)
+      try {
+        const proof = await client.getFeatureProof(featureId);
+        if (proof && proof.exit_code === 0) {
+          state.featureProved(featureId);
+        }
+      } catch {
+        // No proof yet -- normal for fresh starts
       }
 
       // Store spec details for tier assessment
@@ -110,6 +119,8 @@ export function registerGates(
       if (exitCode === 0) {
         if (!featureId) return undefined;
         state.featureProved(featureId);
+        state.setVerified(featureId, false);
+        state.advancePhase(featureId, 'critical_reviewing');
       }
     }
 
@@ -145,10 +156,13 @@ export function registerGates(
           ? event.input.feature_id
           : undefined;
       const comments = event.input.comments;
-      if (Array.isArray(comments) && comments.length === 0) {
-        if (!featureId) return undefined;
-        // No-op for phase: verification success only flips the verified flag.
+      if (!featureId || !Array.isArray(comments)) return undefined;
+
+      if (comments.length === 0) {
         state.setVerified(featureId, true);
+      } else {
+        state.setVerified(featureId, false);
+        state.advancePhase(featureId, 'implementing');
       }
     }
 
