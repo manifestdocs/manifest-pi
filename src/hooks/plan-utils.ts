@@ -99,6 +99,9 @@ const SAFE_PATTERNS = [
   /^\s*vitest\b/i,
   /^\s*jest\b/i,
   /^\s*pytest\b/i,
+  /^\s*pnpm\s+(--filter\s+\S+\s+)?(test|check|build|dev|run\b)/i,
+  /^\s*npm\s+(test|run\b)/i,
+  /^\s*yarn\s+(test|run\b)/i,
 ];
 
 export function isSafeCommand(command: string): boolean {

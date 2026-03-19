@@ -23,6 +23,14 @@ describe('isSafeCommand', () => {
   it('allows test runner commands', () => {
     expect(isSafeCommand('pnpm list')).toBe(true);
     expect(isSafeCommand('pnpm audit')).toBe(true);
+    expect(isSafeCommand('pnpm test')).toBe(true);
+    expect(isSafeCommand('pnpm test:run')).toBe(true);
+    expect(isSafeCommand('pnpm check')).toBe(true);
+    expect(isSafeCommand('pnpm build')).toBe(true);
+    expect(isSafeCommand('pnpm run test')).toBe(true);
+    expect(isSafeCommand('pnpm --filter ./manifest-api test:run src/core/storage.test.ts')).toBe(true);
+    expect(isSafeCommand('npm test')).toBe(true);
+    expect(isSafeCommand('npm run build')).toBe(true);
     expect(isSafeCommand('dotnet test')).toBe(true);
     expect(isSafeCommand('cargo test --all')).toBe(true);
     expect(isSafeCommand('vitest run')).toBe(true);
