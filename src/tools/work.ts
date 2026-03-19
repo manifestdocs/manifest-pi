@@ -4,6 +4,7 @@
 
 import type { ManifestClient } from '../client.js';
 import { ApiError, ConflictError } from '../client.js';
+import { featureWebUrl } from '../format.js';
 import type {
   CommitRef,
   EvidenceInput,
@@ -42,7 +43,7 @@ export async function handleStartFeature(
       force: params.force ?? false,
       claim_metadata: params.claim_metadata,
     });
-    return formatStartResult(result);
+    return formatStartResult(result, client.webUrl);
   } catch (err) {
     if (err instanceof ConflictError) {
       return `Error: ${err.body}`;
@@ -69,7 +70,7 @@ export async function handleAssessPlan(
   }
 }
 
-function formatStartResult(result: StartFeatureResponse): string {
+function formatStartResult(result: StartFeatureResponse, baseUrl?: string): string {
   if (!result || typeof result !== 'object') return 'Feature started.';
 
   const parts: string[] = [];
@@ -78,6 +79,8 @@ function formatStartResult(result: StartFeatureResponse): string {
   const displayId = result.display_id ?? result.id?.slice(0, 8) ?? '';
   parts.push(`Started: ${displayId} ${result.title ?? ''} (${result.state ?? 'in_progress'})`);
   if (result.feature_tier) parts.push(`Tier: ${result.feature_tier}`);
+  const webUrl = baseUrl ? featureWebUrl(baseUrl, result.project_slug, result.display_id) : null;
+  if (webUrl) parts.push(`Web: ${webUrl}`);
 
   // Spec status
   if (result.spec_status) parts.push(`Spec: ${result.spec_status}`);

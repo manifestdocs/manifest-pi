@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ManifestClient, ApiError, ConnectionError } from '../../src/client.js';
+import { ManifestClient, ApiError, ConflictError, ConnectionError, NotFoundError } from '../../src/client.js';
 import {
   handleListProjects,
   handleFindFeatures,
@@ -13,6 +13,7 @@ import {
 // Mock the client
 function createMockClient(): ManifestClient {
   return {
+    webUrl: 'http://localhost:4242',
     listProjectsByDirectory: vi.fn(),
     listProjects: vi.fn(),
     findFeatures: vi.fn(),
@@ -164,6 +165,48 @@ describe('discovery tools', () => {
       expect(result).toContain('Implemented basic auth');
     });
 
+    it('card view includes Web: line when project_slug present', async () => {
+      (client.getFeatureContext as any).mockResolvedValue({
+        id: '1',
+        display_id: 'TST-1',
+        title: 'OAuth Login',
+        state: 'proposed',
+        details: 'Login via OAuth',
+        desired_details: null,
+        priority: 0,
+        project_slug: 'test-project',
+        breadcrumb: [],
+        parent: null,
+        siblings: [],
+        children: [],
+      });
+
+      const result = await handleGetFeature(client, { feature_id: '1', view: 'card' });
+      expect(result).toContain('Web:');
+      expect(result).toContain('test-project');
+    });
+
+    it('full view includes Web: line when project_slug present', async () => {
+      (client.getFeatureContext as any).mockResolvedValue({
+        id: '1',
+        display_id: 'TST-1',
+        title: 'OAuth Login',
+        state: 'proposed',
+        details: null,
+        desired_details: null,
+        priority: 0,
+        project_slug: 'test-project',
+        breadcrumb: [],
+        parent: null,
+        siblings: [],
+        children: [],
+      });
+
+      const result = await handleGetFeature(client, { feature_id: '1', view: 'full' });
+      expect(result).toContain('Web:');
+      expect(result).toContain('test-project');
+    });
+
     it('returns API error on failure', async () => {
       (client.getFeatureContext as any).mockRejectedValue(
         new ApiError(404, 'Not Found', 'Feature not found'),
@@ -188,13 +231,46 @@ describe('discovery tools', () => {
       expect(result).toContain('Next Feature');
     });
 
-    it('returns API error on failure', async () => {
+    it('returns friendly message when getNextFeature throws NotFoundError', async () => {
       (client.getNextFeature as any).mockRejectedValue(
-        new ApiError(404, 'Not Found', 'No project'),
+        new NotFoundError('No workable features'),
       );
 
-      const result = await handleGetNextFeature(client, { project_id: 'bad' });
-      expect(result).toContain('Error (404)');
+      const result = await handleGetNextFeature(client, { project_id: 'proj-1' });
+      expect(result).toContain('No workable features');
+    });
+
+    it('returns "No project found" when directory lookup fails', async () => {
+      (client.listProjectsByDirectory as any).mockRejectedValue(
+        new NotFoundError('{"error":"Project not found"}'),
+      );
+
+      const result = await handleGetNextFeature(client, { directory_path: '/bad/dir' });
+      expect(result).toContain('No project found');
+    });
+
+    it('formats stale features on ConflictError', async () => {
+      const conflictBody = JSON.stringify({
+        error: 'in_progress_features_exist',
+        message: 'There are features in progress',
+        features: [
+          {
+            id: 'f1',
+            title: 'Stale Feature',
+            state: 'in_progress',
+            priority: 0,
+            proof_status: null,
+            completable: false,
+          },
+        ],
+      });
+      (client.getNextFeature as any).mockRejectedValue(
+        new ConflictError(conflictBody),
+      );
+
+      const result = await handleGetNextFeature(client, { project_id: 'proj-1' });
+      expect(result).toContain('still in progress');
+      expect(result).toContain('Stale Feature');
     });
   });
 
@@ -243,6 +319,15 @@ describe('discovery tools', () => {
         project_id: 'proj-1',
       });
       expect(result).toContain('Auth');
+    });
+
+    it('returns "No project found" when directory lookup throws NotFoundError', async () => {
+      (client.listProjectsByDirectory as any).mockRejectedValue(
+        new NotFoundError('{"error":"Project not found"}'),
+      );
+
+      const result = await handleRenderFeatureTree(client, { directory_path: '/bad/dir' });
+      expect(result).toContain('No project found');
     });
 
     it('returns connection error when server is down', async () => {
@@ -302,6 +387,15 @@ describe('discovery tools', () => {
 
       const result = await handleOrient(client, { project_id: 'proj-1' });
       expect(result).toContain('proj-1');
+    });
+
+    it('returns friendly message when directory lookup returns 404', async () => {
+      (client.listProjectsByDirectory as any).mockRejectedValue(
+        new NotFoundError('{"error":"Project not found"}'),
+      );
+
+      const result = await handleOrient(client, { directory_path: '/unknown/dir' });
+      expect(result).toContain('No project found');
     });
 
     it('returns connection error when server is down', async () => {

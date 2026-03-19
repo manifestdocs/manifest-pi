@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   stateSymbol,
   displayId,
+  featureWebUrl,
   renderTree,
   filterTree,
   markdownTable,
@@ -352,6 +353,25 @@ describe('format', () => {
     });
   });
 
+  describe('featureWebUrl', () => {
+    it('returns URL with valid slug and displayId', () => {
+      const url = featureWebUrl('http://localhost:4242', 'my-project', 'MAN-42');
+      expect(url).toBe('http://localhost:4242/app/my-project?feature=MAN-42');
+    });
+
+    it('returns null when slug is null', () => {
+      expect(featureWebUrl('http://localhost:4242', null, 'MAN-42')).toBeNull();
+    });
+
+    it('returns null when displayId is null', () => {
+      expect(featureWebUrl('http://localhost:4242', 'my-project', null)).toBeNull();
+    });
+
+    it('returns null when slug is undefined', () => {
+      expect(featureWebUrl('http://localhost:4242', undefined, 'MAN-42')).toBeNull();
+    });
+  });
+
   describe('renderFeatureCard', () => {
     function makeCtx(overrides: Partial<FeatureWithContext> = {}): FeatureWithContext {
       return {
@@ -421,6 +441,23 @@ describe('format', () => {
       // First and last non-empty lines should be horizontal rules
       expect(lines[0]).toMatch(/^─+$/);
       expect(lines[lines.length - 1]).toMatch(/^─+$/);
+    });
+
+    it('includes Web: line when baseUrl and project_slug present', () => {
+      const output = renderFeatureCard(makeCtx({ project_slug: 'test-proj' }), 'http://localhost:4242');
+      expect(output).toContain('Web:');
+      expect(output).toContain('test-proj');
+      expect(output).toContain('MAN-42');
+    });
+
+    it('does not include Web: line without baseUrl', () => {
+      const output = renderFeatureCard(makeCtx({ project_slug: 'test-proj' }));
+      expect(output).not.toContain('Web:');
+    });
+
+    it('does not include Web: line without project_slug', () => {
+      const output = renderFeatureCard(makeCtx(), 'http://localhost:4242');
+      expect(output).not.toContain('Web:');
     });
   });
 });

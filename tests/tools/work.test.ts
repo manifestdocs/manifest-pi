@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ManifestClient, ConflictError } from '../../src/client.js';
+import { ManifestClient, ApiError, ConflictError, NotFoundError } from '../../src/client.js';
 import {
   handleStartFeature,
   handleAssessPlan,
@@ -10,6 +10,7 @@ import {
 
 function createMockClient(): ManifestClient {
   return {
+    webUrl: 'http://localhost:4242',
     startFeature: vi.fn(),
     getFeatureContext: vi.fn(),
     updateFeature: vi.fn(),
@@ -46,6 +47,22 @@ describe('work tools', () => {
       expect(result).toContain('OAuth Login');
     });
 
+    it('includes Web: line when project_slug present', async () => {
+      (client.startFeature as any).mockResolvedValue({
+        id: '1',
+        display_id: 'TST-1',
+        title: 'OAuth Login',
+        state: 'in_progress',
+        details: null,
+        project_slug: 'test-project',
+        breadcrumb: [],
+      });
+
+      const result = await handleStartFeature(client, { feature_id: '1' });
+      expect(result).toContain('Web:');
+      expect(result).toContain('test-project');
+    });
+
     it('returns error message on claim conflict', async () => {
       (client.startFeature as any).mockRejectedValue(
         new ConflictError('Feature already claimed by claude'),
@@ -53,6 +70,16 @@ describe('work tools', () => {
 
       const result = await handleStartFeature(client, { feature_id: '1' });
       expect(result).toContain('already claimed');
+    });
+
+    it('returns error message with NotFoundError', async () => {
+      (client.startFeature as any).mockRejectedValue(
+        new ApiError(404, 'Not Found', 'Feature not found'),
+      );
+
+      const result = await handleStartFeature(client, { feature_id: 'bad-id' });
+      expect(result).toContain('Error (404)');
+      expect(result).toContain('Feature not found');
     });
   });
 
@@ -73,6 +100,18 @@ describe('work tools', () => {
         details: 'Updated details',
       });
       expect(result).toContain('Updated');
+    });
+
+    it('returns error message on NotFoundError', async () => {
+      (client.updateFeature as any).mockRejectedValue(
+        new ApiError(404, 'Not Found', 'Feature not found'),
+      );
+
+      const result = await handleUpdateFeature(client, {
+        feature_id: 'bad-id',
+        details: 'New details',
+      } as any);
+      expect(result).toContain('Error (404)');
     });
   });
 
@@ -159,6 +198,20 @@ describe('work tools', () => {
         backfill: false,
       });
       expect(result).toContain('implemented');
+    });
+
+    it('returns error message on ApiError', async () => {
+      (client.completeFeature as any).mockRejectedValue(
+        new ApiError(422, 'Unprocessable Entity', 'Missing proof'),
+      );
+
+      const result = await handleCompleteFeature(client, {
+        feature_id: '1',
+        summary: 'Done',
+        commits: ['abc1234'],
+      });
+      expect(result).toContain('Error (422)');
+      expect(result).toContain('Missing proof');
     });
   });
 });
