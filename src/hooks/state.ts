@@ -6,7 +6,12 @@
  * Supports team mode for deterministic feature workflow.
  */
 
-export type WorkflowPhase = 'speccing' | 'spec_approved' | 'implementing' | 'reviewing' | 'complete';
+export type WorkflowPhase =
+  | 'speccing'
+  | 'spec_approved'
+  | 'implementing'
+  | 'critical_reviewing'
+  | 'complete';
 
 export interface FeatureWorkState {
   featureId: string;

@@ -152,8 +152,8 @@ describe('WorkflowState', () => {
       state.advancePhase('f-1', 'implementing');
       expect(state.getPhase('f-1')).toBe('implementing');
 
-      state.advancePhase('f-1', 'reviewing');
-      expect(state.getPhase('f-1')).toBe('reviewing');
+      state.advancePhase('f-1', 'critical_reviewing');
+      expect(state.getPhase('f-1')).toBe('critical_reviewing');
 
       state.advancePhase('f-1', 'complete');
       expect(state.getPhase('f-1')).toBe('complete');
@@ -185,13 +185,35 @@ describe('WorkflowState', () => {
       state.featureStarted('f-3');
 
       state.advancePhase('f-1', 'implementing');
-      state.advancePhase('f-2', 'reviewing');
+      state.advancePhase('f-2', 'critical_reviewing');
       state.featureProved('f-3');
 
       expect(state.getPhase('f-1')).toBe('implementing');
-      expect(state.getPhase('f-2')).toBe('reviewing');
+      expect(state.getPhase('f-2')).toBe('critical_reviewing');
       expect(state.getPhase('f-3')).toBe('speccing');
       expect(state.getFeatureState('f-3')?.proved).toBe(true);
+    });
+  });
+
+  describe('critical review loop', () => {
+    it('supports returning from critical review to implementation and back', () => {
+      state.featureStarted('f-1');
+      state.advancePhase('f-1', 'implementing');
+
+      state.featureProved('f-1');
+      state.advancePhase('f-1', 'critical_reviewing');
+      state.setVerified('f-1', false);
+      expect(state.getPhase('f-1')).toBe('critical_reviewing');
+      expect(state.getFeatureState('f-1')?.verified).toBe(false);
+
+      state.advancePhase('f-1', 'implementing');
+      expect(state.getPhase('f-1')).toBe('implementing');
+
+      state.featureProved('f-1');
+      state.advancePhase('f-1', 'critical_reviewing');
+      state.setVerified('f-1', true);
+      expect(state.getPhase('f-1')).toBe('critical_reviewing');
+      expect(state.getFeatureState('f-1')?.verified).toBe(true);
     });
   });
 

@@ -103,10 +103,8 @@ export function evaluateReadyForImplementation(state: WorkflowState, featureId: 
   return { allow: true };
 }
 
-/** Hard gate: block complete_feature unless reviewed, proved, and verified (team mode only). */
+/** Hard gate: block complete_feature unless the Critical Reviewer pass succeeded. */
 export function evaluateReadyForCompletion(state: WorkflowState, featureId: string): GateDecision {
-  if (!state.teamMode) return { allow: true };
-
   const feature = state.getFeatureState(featureId);
   if (!feature) {
     return {
@@ -115,10 +113,10 @@ export function evaluateReadyForCompletion(state: WorkflowState, featureId: stri
     };
   }
 
-  if (feature.phase !== 'reviewing') {
+  if (feature.phase !== 'critical_reviewing') {
     return {
       allow: false,
-      reason: 'Cannot complete feature — not in reviewing phase. Current phase: ' +
+      reason: 'Cannot complete feature — not in Critical Reviewer phase. Current phase: ' +
         feature.phase +
         '. DO NOT attempt to work around this restriction.',
     };
@@ -134,7 +132,7 @@ export function evaluateReadyForCompletion(state: WorkflowState, featureId: stri
   if (!feature.verified) {
     return {
       allow: false,
-      reason: 'Cannot complete feature without verification. Dispatch code-reviewer first. DO NOT attempt to work around this restriction.',
+      reason: 'Cannot complete feature without a passing Critical Reviewer result. Run manifest_verify_feature, then record the result with manifest_record_verification. DO NOT attempt to work around this restriction.',
     };
   }
 

@@ -174,51 +174,44 @@ Admins see a delete button on the project settings page.
   });
 
   describe('evaluateReadyForCompletion', () => {
-    it('allows when not in team mode', () => {
+    it('blocks unknown features', () => {
       const decision = evaluateReadyForCompletion(state, 'f-1');
-      expect(decision.allow).toBe(true);
+      expect(decision.allow).toBe(false);
+      expect(decision.reason).toContain('No workflow state');
     });
 
-    it('blocks when not in reviewing phase', () => {
-      state.enterTeamMode('f-1');
+    it('blocks when not in Critical Reviewer phase', () => {
+      state.featureStarted('f-1');
       state.advancePhase('f-1', 'implementing');
       const decision = evaluateReadyForCompletion(state, 'f-1');
       expect(decision.allow).toBe(false);
-      expect(decision.reason).toContain('not in reviewing phase');
+      expect(decision.reason).toContain('Critical Reviewer phase');
     });
 
-    it('blocks when in reviewing but not proved', () => {
-      state.enterTeamMode('f-1');
-      state.advancePhase('f-1', 'reviewing');
-      state.setVerified('f-1', true);
+    it('blocks when in Critical Reviewer phase but not verified', () => {
+      state.featureStarted('f-1');
+      state.advancePhase('f-1', 'critical_reviewing');
       const decision = evaluateReadyForCompletion(state, 'f-1');
       expect(decision.allow).toBe(false);
       expect(decision.reason).toContain('passing proof');
     });
 
-    it('blocks when in reviewing but not verified', () => {
-      state.enterTeamMode('f-1');
-      state.advancePhase('f-1', 'reviewing');
+    it('blocks when in Critical Reviewer phase with proof but not verified', () => {
+      state.featureStarted('f-1');
+      state.advancePhase('f-1', 'critical_reviewing');
       state.featureProved('f-1');
       const decision = evaluateReadyForCompletion(state, 'f-1');
       expect(decision.allow).toBe(false);
-      expect(decision.reason).toContain('verification');
+      expect(decision.reason).toContain('Critical Reviewer');
     });
 
-    it('allows when reviewing, proved, and verified', () => {
-      state.enterTeamMode('f-1');
-      state.advancePhase('f-1', 'reviewing');
+    it('allows when in Critical Reviewer phase and verified', () => {
+      state.featureStarted('f-1');
+      state.advancePhase('f-1', 'critical_reviewing');
       state.featureProved('f-1');
       state.setVerified('f-1', true);
       const decision = evaluateReadyForCompletion(state, 'f-1');
       expect(decision.allow).toBe(true);
-    });
-
-    it('blocks unknown features in team mode', () => {
-      state.enterTeamMode('f-1');
-      const decision = evaluateReadyForCompletion(state, 'unknown');
-      expect(decision.allow).toBe(false);
-      expect(decision.reason).toContain('No workflow state');
     });
   });
 

@@ -132,7 +132,7 @@ The `manifest_start_feature` tool records that work is beginning and returns the
 6. Remind the user:
 
    ```
-   When you're done, use /complete to record your work.
+   When you're done, run /review, then use /complete to record your work.
 
    Tip: Commit early and often with meaningful messages.
    ```
