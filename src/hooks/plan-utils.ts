@@ -1,6 +1,10 @@
 /**
  * Pure utility functions for plan mode.
  * Extracted for testability -- no Pi dependencies.
+ *
+ * Transitional scaffolding: plan mode enforces read-only investigation
+ * before implementation. As models improve at self-regulating tool use,
+ * this mechanical enforcement can be relaxed or removed.
  */
 
 // Destructive commands blocked in plan mode
@@ -99,9 +103,6 @@ const SAFE_PATTERNS = [
   /^\s*vitest\b/i,
   /^\s*jest\b/i,
   /^\s*pytest\b/i,
-  /^\s*pnpm\s+(--filter\s+\S+\s+)?(test|check|build|dev|run\b)/i,
-  /^\s*npm\s+(test|run\b)/i,
-  /^\s*yarn\s+(test|run\b)/i,
 ];
 
 export function isSafeCommand(command: string): boolean {
@@ -166,6 +167,20 @@ export function extractDoneSteps(message: string): number[] {
     if (Number.isFinite(step)) steps.push(step);
   }
   return steps;
+}
+
+export function stripDoneMarkers(message: string): string {
+  const lines = message.split('\n');
+  const cleanedLines = lines
+    .map((line) => {
+      const cleaned = line
+        .replace(/\s*\[DONE:\d+\]\s*/gi, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      return cleaned;
+    })
+    .filter((line) => line.length > 0);
+  return cleanedLines.join('\n');
 }
 
 export function markCompletedSteps(text: string, items: TodoItem[]): number {

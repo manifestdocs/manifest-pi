@@ -5,6 +5,7 @@ import {
   extractTodoItems,
   extractDoneSteps,
   markCompletedSteps,
+  stripDoneMarkers,
   type TodoItem,
 } from '../../src/hooks/plan-utils.js';
 
@@ -20,20 +21,27 @@ describe('isSafeCommand', () => {
     expect(isSafeCommand('rg "pattern" src/')).toBe(true);
   });
 
-  it('allows test runner commands', () => {
+  it('allows package inspection and direct test runner commands', () => {
     expect(isSafeCommand('pnpm list')).toBe(true);
     expect(isSafeCommand('pnpm audit')).toBe(true);
-    expect(isSafeCommand('pnpm test')).toBe(true);
-    expect(isSafeCommand('pnpm test:run')).toBe(true);
-    expect(isSafeCommand('pnpm check')).toBe(true);
-    expect(isSafeCommand('pnpm build')).toBe(true);
-    expect(isSafeCommand('pnpm run test')).toBe(true);
-    expect(isSafeCommand('pnpm --filter ./manifest-api test:run src/core/storage.test.ts')).toBe(true);
-    expect(isSafeCommand('npm test')).toBe(true);
-    expect(isSafeCommand('npm run build')).toBe(true);
     expect(isSafeCommand('dotnet test')).toBe(true);
     expect(isSafeCommand('cargo test --all')).toBe(true);
     expect(isSafeCommand('vitest run')).toBe(true);
+  });
+
+  it('blocks package-manager script dispatch in plan mode', () => {
+    expect(isSafeCommand('pnpm test')).toBe(false);
+    expect(isSafeCommand('pnpm test:run')).toBe(false);
+    expect(isSafeCommand('pnpm check')).toBe(false);
+    expect(isSafeCommand('pnpm build')).toBe(false);
+    expect(isSafeCommand('pnpm dev')).toBe(false);
+    expect(isSafeCommand('pnpm run test')).toBe(false);
+    expect(
+      isSafeCommand('pnpm --filter ./manifest-api test:run src/core/storage.test.ts'),
+    ).toBe(false);
+    expect(isSafeCommand('npm test')).toBe(false);
+    expect(isSafeCommand('npm run build')).toBe(false);
+    expect(isSafeCommand('yarn run build')).toBe(false);
   });
 
   it('allows branch creation in plan mode', () => {
@@ -150,6 +158,18 @@ describe('extractDoneSteps', () => {
 
   it('returns empty for no markers', () => {
     expect(extractDoneSteps('no markers here')).toEqual([]);
+  });
+});
+
+describe('stripDoneMarkers', () => {
+  it('removes standalone marker lines', () => {
+    const text = 'Finished tests\n[DONE:1]\nUpdated handlers';
+    expect(stripDoneMarkers(text)).toBe('Finished tests\nUpdated handlers');
+  });
+
+  it('removes inline markers and preserves surrounding text', () => {
+    const text = '[DONE:2] Updated endpoint behavior\nConflict fixed [DONE:3]';
+    expect(stripDoneMarkers(text)).toBe('Updated endpoint behavior\nConflict fixed');
   });
 });
 
