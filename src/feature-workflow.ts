@@ -31,6 +31,7 @@ import {
   isSafeCommand,
   extractTodoItems,
   markCompletedSteps,
+  stripDoneMarkers,
   type TodoItem,
 } from './hooks/plan-utils.js';
 import {
@@ -67,9 +68,10 @@ async function checkForUpdate(): Promise<string | null> {
   }
 }
 
-function isAssistantMessage(
-  m: { role?: string; content?: unknown },
-): m is AssistantMessage {
+function isAssistantMessage(m: {
+  role?: string;
+  content?: unknown;
+}): m is AssistantMessage {
   return m.role === 'assistant' && Array.isArray(m.content);
 }
 
@@ -100,37 +102,16 @@ Feature states: proposed, in_progress, implemented, blocked, archived.
 
 ### Feature workflow
 
-When implementing a feature, follow this sequence:
+The workflow runs autonomously from CLAIM through COMPLETE in one session -- do not stop partway. All 8 steps must run. Failing tests, proof failures, and critical review findings are iteration points, not stopping points -- fix the issue and iterate (build, prove, review) until everything passes, then complete immediately.
 
-1. **SPEC** -- Read the feature with manifest_get_feature. If the spec is missing or thin (no user story, no acceptance criteria), write one with manifest_update_feature before proceeding. A good spec has: "As a [user], I can [capability] so that [benefit]" + checkbox items (- [ ] ...) for testable assertions.
-
-2. **CLAIM** -- Call manifest_start_feature. It validates the spec and returns your specification. After it succeeds, you will enter plan mode automatically. Explore the codebase and produce a numbered implementation plan.
-
-3. **PLAN** -- You are now in read-only plan mode. Use read, bash, grep, find, ls + manifest read tools to understand the codebase. Produce a numbered plan under a "Plan:" header. If investigation reveals significant hidden complexity (cross-module changes, DB migrations, new architectural patterns), include [COMPLEX] on a line by itself to flag it. Do NOT attempt to write or edit files.
-
-4. **BUILD** -- After the user approves your plan, write tools unlock. The feature details ARE your specification. Check the breadcrumb for parent context. Contract-first: define interfaces from the spec before writing implementation. TDD red-green cycle:
-   - Read acceptance criteria -- each checkbox is a test case
-   - Write failing tests first
-   - Call manifest_prove_feature to record the failure (red)
-   - Implement with guard clauses and early returns
-   - Call manifest_prove_feature again (green)
-   - Iterate until all tests pass
-   - Mark completed steps with [DONE:n] tags
-   - Tick off acceptance criteria checkboxes with manifest_update_feature as you go
-
-5. **PROVE** -- Record final test evidence with manifest_prove_feature (must have exit_code 0). Scope your test command to THIS feature only (use -t "pattern", line numbers, or dedicated test files).
-
-6. **DOCUMENT** -- Update the feature spec with manifest_update_feature to reflect what was actually built.
-
-7. **COMPLETE** -- IMMEDIATELY call manifest_complete_feature with a summary and commit SHAs. Do NOT ask permission or wait for confirmation -- if proof passed, complete the feature. Get commit SHAs from \`git log --oneline -5\`. After completing, briefly explain what you built and why it improves the project.
-
-### Spec writing
-
-Every leaf feature spec has:
-1. User story: "As a [user], I can [capability] so that [benefit]."
-2. Acceptance criteria: checkbox items that can be verified in tests.
-
-Specs are focused: 50 to 500 words. The feature's parent nodes and the root node have system and feature set technical details. You can add feature specific technical details as needed.
+1. **SPEC** -- Read the feature with manifest_get_feature. If the spec is thin, write one with manifest_update_feature before proceeding.
+2. **CLAIM** -- Call manifest_start_feature. It validates the spec and returns your specification. You will enter plan mode automatically.
+3. **PLAN** -- Read-only mode. Explore the codebase, then produce a numbered plan under a "Plan:" header. Include [COMPLEX] if you find significant hidden complexity.
+4. **BUILD** -- After plan approval, write tools unlock. TDD red-green cycle: write failing tests, call manifest_prove_feature (red), implement, prove again (green). Tick off acceptance criteria as you go.
+5. **PROVE** -- Record final test evidence with manifest_prove_feature (must have exit_code 0). Scope tests to THIS feature only.
+6. **CRITICAL REVIEW** -- Use manifest_verify_feature to inspect implementation against spec. Call manifest_record_verification with findings (empty comments = pass). If issues found, return to BUILD and fix them.
+7. **DOCUMENT** -- Update the feature spec with manifest_update_feature to reflect what was actually built.
+8. **COMPLETE** -- IMMEDIATELY call manifest_complete_feature with a summary and commit SHAs. Do NOT ask permission or wait for confirmation.
 
 ### When NOT to use the feature workflow
 
@@ -142,20 +123,13 @@ Specs are focused: 50 to 500 words. The feature's parent nodes and the root node
 
 Some tools return pre-formatted text (manifest_render_feature_tree, manifest_get_project_history). Do NOT repeat, summarize, or reformat their output -- the tool result is already displayed to the user.
 
-### Rules
-
-- NEVER call manifest_start_feature on a feature set (has children)
-- NEVER change a feature's target version during implementation
-- NEVER ask permission to complete a feature -- if proof passed, complete it immediately
-- Call manifest_start_feature BEFORE writing any code
-- Call manifest_prove_feature BEFORE manifest_complete_feature
-- The full workflow (CLAIM through COMPLETE) runs autonomously in one session -- do not stop partway
 `;
 
 const COMMAND_SKILLS: Array<string | { skill: string; command: string }> = [
   'next',
   'features',
   'start',
+  'review',
   'complete',
   'init',
   'decompose',
@@ -176,7 +150,7 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
   const updatePromise = checkForUpdate();
 
   registerAllTools(pi, client, workflowState);
-  registerGates(pi, workflowState, planController);
+  registerGates(pi, workflowState, client, planController);
 
   pi.registerFlag('plan', {
     description: 'Start in plan mode (read-only exploration)',
@@ -289,6 +263,8 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
     manifest_start_feature: 'Claiming feature...',
     manifest_decompose: 'Building feature tree...',
     manifest_prove_feature: 'Recording test evidence...',
+    manifest_verify_feature: 'Running Critical Reviewer...',
+    manifest_record_verification: 'Recording Critical Reviewer result...',
     manifest_complete_feature: 'Completing feature...',
     manifest_render_feature_tree: 'Rendering feature tree...',
     manifest_update_feature: 'Updating feature spec...',
@@ -297,121 +273,121 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
     manifest_list_projects: 'Finding project...',
   };
 
-  pi.on(
-    'tool_call',
-    async (
-      event: ToolCallEvent,
-      ctx: ExtensionContext,
-    ) => {
-      if (event.toolName.startsWith('manifest_') && ctx.hasUI) {
-        const msg =
-          MANIFEST_WORKING_MESSAGES[event.toolName] ?? 'Updating Manifest...';
-        ctx.ui.setWorkingMessage(msg);
-      }
-
-      if (planController.getState() !== 'plan' || event.toolName !== 'bash') {
-        return;
-      }
-
-      const command = (event.input as { command?: string }).command ?? '';
-      if (!isSafeCommand(command)) {
-        return {
-          block: true,
-          reason: `Plan mode: command blocked (not in read-only allowlist). Use /plan to exit plan mode first.\nCommand: ${command}`,
-        };
-      }
-    },
-  );
-
-  pi.on('tool_execution_end', async (_event: unknown, ctx: ExtensionContext) => {
-    if (ctx.hasUI) {
-      ctx.ui.setWorkingMessage();
+  pi.on('tool_call', async (event: ToolCallEvent, ctx: ExtensionContext) => {
+    if (event.toolName.startsWith('manifest_') && ctx.hasUI) {
+      const msg =
+        MANIFEST_WORKING_MESSAGES[event.toolName] ?? 'Updating Manifest...';
+      ctx.ui.setWorkingMessage(msg);
     }
-  });
 
-  pi.on('tool_result', async (event: ToolResultEvent, extCtx: ExtensionContext) => {
-    if (event.isError) return;
-
-    if (event.toolName === 'manifest_start_feature') {
-      completionSucceeded = false;
-      const featureId = (event.input as { feature_id?: string }).feature_id;
-      if (!featureId) return;
-
-      try {
-        const ctx = await client.getFeatureContext(featureId);
-        if (ctx.breadcrumb?.length > 0) {
-          const budgeted = lodBreadcrumb(ctx.breadcrumb);
-          const withDetails = budgeted.filter((b) => b.details);
-          if (withDetails.length > 0) {
-            const parts = withDetails.map((b) => `### ${b.title}\n${b.details}`);
-            workflowState.setAncestorContext(parts.join('\n\n'));
-          }
-        }
-        const url = featureWebUrl(client.webUrl, ctx.project_slug, ctx.display_id);
-        if (url && extCtx.hasUI) {
-          extCtx.ui.setStatus('feature-url', url);
-        }
-      } catch {
-        // Best effort — ancestor context is supplementary
-      }
+    if (planController.getState() !== 'plan' || event.toolName !== 'bash') {
       return;
     }
 
-    if (event.toolName === 'manifest_complete_feature') {
-      if (extCtx.hasUI) {
-        extCtx.ui.setStatus('feature-url', undefined);
-      }
-      if (planController.getState() === 'execute') {
-        const todos = planController.getTodoItems();
-        for (const todo of todos) {
-          todo.completed = true;
-        }
-        planController.setTodoItems(todos);
-        completionSucceeded = true;
-        persistPlanState();
-      }
+    const command = (event.input as { command?: string }).command ?? '';
+    if (!isSafeCommand(command)) {
+      return {
+        block: true,
+        reason: `Plan mode: command blocked (not in read-only allowlist). Use /plan to exit plan mode first.\nCommand: ${command}`,
+      };
     }
   });
 
   pi.on(
-    'context',
-    async (event: ContextEvent) => {
-      if (planController.getState() !== 'normal') return;
-
-      return {
-        messages: event.messages.filter((m) => {
-          const msg = m as {
-            role: string;
-            content: unknown;
-            customType?: string;
-          };
-          if (msg.customType === 'plan-mode-context') return false;
-          if (msg.customType === 'plan-execution-context') return false;
-          if (msg.role !== 'user') return true;
-
-          const content = msg.content;
-          if (typeof content === 'string') {
-            return !content.includes('[PLAN MODE ACTIVE]');
-          }
-          if (Array.isArray(content)) {
-            return !content.some(
-              (c) =>
-                c.type === 'text' &&
-                (c as TextContent).text?.includes('[PLAN MODE ACTIVE]'),
-            );
-          }
-          return true;
-        }),
-      };
+    'tool_execution_end',
+    async (_event: unknown, ctx: ExtensionContext) => {
+      if (ctx.hasUI) {
+        ctx.ui.setWorkingMessage();
+      }
     },
   );
 
   pi.on(
+    'tool_result',
+    async (event: ToolResultEvent, extCtx: ExtensionContext) => {
+      if (event.isError) return;
+
+      if (event.toolName === 'manifest_start_feature') {
+        completionSucceeded = false;
+        const featureId = (event.input as { feature_id?: string }).feature_id;
+        if (!featureId) return;
+
+        try {
+          const ctx = await client.getFeatureContext(featureId);
+          if (ctx.breadcrumb?.length > 0) {
+            const budgeted = lodBreadcrumb(ctx.breadcrumb);
+            const withDetails = budgeted.filter((b) => b.details);
+            if (withDetails.length > 0) {
+              const parts = withDetails.map(
+                (b) => `### ${b.title}\n${b.details}`,
+              );
+              workflowState.setAncestorContext(parts.join('\n\n'));
+            }
+          }
+          const url = featureWebUrl(
+            client.webUrl,
+            ctx.project_slug,
+            ctx.display_id,
+          );
+          if (url && extCtx.hasUI) {
+            extCtx.ui.setStatus('feature-url', url);
+          }
+        } catch {
+          // Best effort — ancestor context is supplementary
+        }
+        return;
+      }
+
+      if (event.toolName === 'manifest_complete_feature') {
+        if (extCtx.hasUI) {
+          extCtx.ui.setStatus('feature-url', undefined);
+        }
+        if (planController.getState() === 'execute') {
+          const todos = planController.getTodoItems();
+          for (const todo of todos) {
+            todo.completed = true;
+          }
+          planController.setTodoItems(todos);
+          completionSucceeded = true;
+          persistPlanState();
+        }
+      }
+    },
+  );
+
+  pi.on('context', async (event: ContextEvent) => {
+    if (planController.getState() !== 'normal') return;
+
+    return {
+      messages: event.messages.filter((m) => {
+        const msg = m as {
+          role: string;
+          content: unknown;
+          customType?: string;
+        };
+        if (msg.customType === 'plan-mode-context') return false;
+        if (msg.customType === 'plan-execution-context') return false;
+        if (msg.role !== 'user') return true;
+
+        const content = msg.content;
+        if (typeof content === 'string') {
+          return !content.includes('[PLAN MODE ACTIVE]');
+        }
+        if (Array.isArray(content)) {
+          return !content.some(
+            (c) =>
+              c.type === 'text' &&
+              (c as TextContent).text?.includes('[PLAN MODE ACTIVE]'),
+          );
+        }
+        return true;
+      }),
+    };
+  });
+
+  pi.on(
     'before_agent_start',
-    async (
-      event: BeforeAgentStartEvent,
-      _ctx: ExtensionContext,
-    ) => {
+    async (event: BeforeAgentStartEvent, _ctx: ExtensionContext) => {
       let systemPrompt = event.systemPrompt + MANIFEST_CONTEXT;
 
       const ancestor = workflowState.ancestorContext;
@@ -430,7 +406,7 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
 You are in plan mode -- a read-only exploration phase before implementation.
 
 Restrictions:
-- You can only use: read, bash, grep, find, ls, questionnaire + manifest read tools
+- You can only use: read, bash, grep, find, ls + manifest read tools
 - You CANNOT use: edit, write, or manifest write tools (modifications are disabled)
 - Bash is restricted to an allowlist of read-only commands
 
@@ -493,6 +469,11 @@ Work through ALL remaining steps autonomously without stopping. Do not pause bet
       planController.setTodoItems(todos);
       planController.refreshDisplay(ctx);
       persistPlanState();
+
+      for (const block of event.message.content) {
+        if (block.type !== 'text') continue;
+        block.text = stripDoneMarkers(block.text);
+      }
     }
   });
 
@@ -560,16 +541,20 @@ Work through ALL remaining steps autonomously without stopping. Do not pause bet
       ? detectEscalation(getTextContent(lastAssistant))
       : false;
     const stepCount = todos.length;
-    const tier = stepCount === 0
-      ? 'full'
-      : resolveTier(stepCount, criteriaCount, agentEscalated);
+    const tier =
+      stepCount === 0
+        ? 'full'
+        : resolveTier(stepCount, criteriaCount, agentEscalated);
     planController.setResolvedTier(tier);
 
     if (todos.length > 0) {
       const todoListText = todos
         .map((t, i) => `${i + 1}. ${t.text}`)
         .join('\n');
-      ctx.ui.notify(`Plan (${todos.length} steps, ${tier}):\n${todoListText}`, 'info');
+      ctx.ui.notify(
+        `Plan (${todos.length} steps, ${tier}):\n${todoListText}`,
+        'info',
+      );
     }
 
     if (yoloMode) {
@@ -596,13 +581,10 @@ Work through ALL remaining steps autonomously without stopping. Do not pause bet
       return;
     }
 
-    const choice = await ctx.ui.select(
-      'Implementation plan ready',
-      [
-        todos.length > 0 ? 'Implement (track progress)' : 'Implement',
-        'Refine the plan',
-      ],
-    );
+    const choice = await ctx.ui.select('Implementation plan ready', [
+      todos.length > 0 ? 'Implement (track progress)' : 'Implement',
+      'Refine the plan',
+    ]);
 
     if (choice?.startsWith('Implement')) {
       startExecution(todos, ctx);
@@ -637,9 +619,11 @@ Work through ALL remaining steps autonomously without stopping. Do not pause bet
         (e: { type: string; customType?: string }) =>
           e.type === 'custom' && e.customType === 'plan-mode',
       )
-      .pop() as {
-        data?: { state: string; tier?: string; todos?: TodoItem[] };
-      } | undefined;
+      .pop() as
+      | {
+          data?: { state: string; tier?: string; todos?: TodoItem[] };
+        }
+      | undefined;
 
     if (planModeEntry?.data) {
       const savedState = planModeEntry.data.state;
@@ -669,7 +653,8 @@ Work through ALL remaining steps autonomously without stopping. Do not pause bet
             entry.type === 'message' &&
             'message' in entry &&
             isAssistantMessage(
-              (entry as { message: { role: string; content: unknown } }).message,
+              (entry as { message: { role: string; content: unknown } })
+                .message,
             )
           ) {
             messages.push((entry as { message: AssistantMessage }).message);

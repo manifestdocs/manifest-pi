@@ -232,6 +232,7 @@ describe('Manifest Pi extension', () => {
         'next',
         'features',
         'start',
+        'review',
         'complete',
         'init',
         'decompose',
@@ -315,6 +316,7 @@ describe('Manifest Pi extension', () => {
 
     expect(result.systemPrompt).toContain('base');
     expect(result.systemPrompt).toContain('## Manifest');
+    expect(result.systemPrompt).toContain('CRITICAL REVIEW');
     expect(result).not.toHaveProperty('tools');
   });
 
@@ -394,5 +396,267 @@ describe('Manifest Pi extension', () => {
     expect(
       pi.sentMessages.some((entry) => entry.message.customType === 'plan-complete'),
     ).toBe(true);
+  });
+
+  it('tracks done markers while stripping them from visible assistant text', async () => {
+    const planCommand = pi.commands.find((command) => command.name === 'plan');
+    expect(planCommand).toBeDefined();
+
+    const commandContext = createCommandContext();
+    await planCommand!.handler('', commandContext);
+
+    const planMessage = {
+      role: 'assistant',
+      content: [
+        {
+          type: 'text',
+          text: 'Plan:\n1. Add tests for the feature\n2. Update the workflow handler\n3. Record proof and completion state',
+        },
+      ],
+    };
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'agent_end',
+      { type: 'agent_end', messages: [planMessage] },
+      commandContext,
+    );
+
+    const executionMessage = {
+      role: 'assistant',
+      content: [
+        {
+          type: 'text',
+          text: '[DONE:1] Added tests\n[DONE:2]\nUpdated the workflow handler',
+        },
+      ],
+    };
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'turn_end',
+      { type: 'turn_end', message: executionMessage },
+      commandContext,
+    );
+
+    expect(commandContext.ui.setStatus).toHaveBeenLastCalledWith('plan-mode', '2/3');
+    expect(executionMessage.content[0].text).toBe(
+      'Added tests\nUpdated the workflow handler',
+    );
+  });
+
+  it('requires proof, Critical Reviewer pass, and spec update before completion', async () => {
+    const ctx = createContext({ hasUI: false });
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_start_feature',
+        input: { feature_id: 'feature-123' },
+        content: [{ type: 'text', text: '## Specification\nAs a user, I can do the thing.\n\n- [ ] It works' }],
+      },
+      ctx,
+    );
+
+    let [result] = await emitHandlers(
+      pi.eventHandlers,
+      'tool_call',
+      {
+        type: 'tool_call',
+        toolName: 'manifest_complete_feature',
+        input: { feature_id: 'feature-123' },
+      },
+      ctx,
+    );
+    expect(result).toMatchObject({
+      block: true,
+      reason: expect.stringContaining('passing proof'),
+    });
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_prove_feature',
+        input: { feature_id: 'feature-123', exit_code: 0 },
+        content: [{ type: 'text', text: 'proved' }],
+      },
+      ctx,
+    );
+
+    [result] = await emitHandlers(
+      pi.eventHandlers,
+      'tool_call',
+      {
+        type: 'tool_call',
+        toolName: 'manifest_complete_feature',
+        input: { feature_id: 'feature-123' },
+      },
+      ctx,
+    );
+    expect(result).toMatchObject({
+      block: true,
+      reason: expect.stringContaining('Critical Reviewer'),
+    });
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_record_verification',
+        input: {
+          feature_id: 'feature-123',
+          comments: [],
+        },
+        content: [{ type: 'text', text: 'passed' }],
+      },
+      ctx,
+    );
+
+    [result] = await emitHandlers(
+      pi.eventHandlers,
+      'tool_call',
+      {
+        type: 'tool_call',
+        toolName: 'manifest_complete_feature',
+        input: { feature_id: 'feature-123' },
+      },
+      ctx,
+    );
+    expect(result).toMatchObject({
+      block: true,
+      reason: expect.stringContaining('updating the spec'),
+    });
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_update_feature',
+        input: {
+          feature_id: 'feature-123',
+          details: 'As a user, I can do the thing.\n\n- [x] It works',
+        },
+        content: [{ type: 'text', text: 'updated' }],
+      },
+      ctx,
+    );
+
+    [result] = await emitHandlers(
+      pi.eventHandlers,
+      'tool_call',
+      {
+        type: 'tool_call',
+        toolName: 'manifest_complete_feature',
+        input: { feature_id: 'feature-123' },
+      },
+      ctx,
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it('returns to implementation when Critical Reviewer records findings', async () => {
+    const ctx = createContext({ hasUI: false });
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_start_feature',
+        input: { feature_id: 'feature-456' },
+        content: [{ type: 'text', text: '## Specification\nAs a user, I can do the thing.\n\n- [ ] It works' }],
+      },
+      ctx,
+    );
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_prove_feature',
+        input: { feature_id: 'feature-456', exit_code: 0 },
+        content: [{ type: 'text', text: 'proved' }],
+      },
+      ctx,
+    );
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_record_verification',
+        input: {
+          feature_id: 'feature-456',
+          comments: [{
+            title: 'Missing unhappy-path test',
+            severity: 'major',
+            body: 'No coverage for storage write failure.',
+            file: 'src/routes/assets.test.ts',
+          }],
+        },
+        content: [{ type: 'text', text: '1 comment' }],
+      },
+      ctx,
+    );
+
+    let [result] = await emitHandlers(
+      pi.eventHandlers,
+      'tool_call',
+      {
+        type: 'tool_call',
+        toolName: 'manifest_complete_feature',
+        input: { feature_id: 'feature-456' },
+      },
+      ctx,
+    );
+
+    expect(result).toMatchObject({
+      block: true,
+      reason: expect.stringContaining('Critical Reviewer phase'),
+    });
+
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_prove_feature',
+        input: { feature_id: 'feature-456', exit_code: 0 },
+        content: [{ type: 'text', text: 'reproved' }],
+      },
+      ctx,
+    );
+
+    [result] = await emitHandlers(
+      pi.eventHandlers,
+      'tool_call',
+      {
+        type: 'tool_call',
+        toolName: 'manifest_complete_feature',
+        input: { feature_id: 'feature-456' },
+      },
+      ctx,
+    );
+
+    expect(result).toMatchObject({
+      block: true,
+      reason: expect.stringContaining('Critical Reviewer'),
+    });
   });
 });
