@@ -9,7 +9,9 @@ Run an interactive feature planning session using structured reasoning phases.
 
 ## Arguments
 
-`$ARGUMENTS` - Optional path to a PRD, spec, or feature description file (e.g., `PRD.md`, `docs/spec.md`). If provided, read the file and use its contents as input — skip the "Gather input" prompt in step 2.
+The user's argument is: `$ARGUMENTS`
+
+If the argument above is not empty, it is a path to a PRD, spec, or feature description file. Read the file and use its contents as input — skip the "Gather input" prompt in step 2.
 
 ## Steps
 
@@ -24,7 +26,7 @@ Run an interactive feature planning session using structured reasoning phases.
 
 ### 2. Gather input
 
-**If $ARGUMENTS is provided:**
+**If a file path argument was given (see Arguments above):**
 - Read the file at the given path
 - Use its contents as input for the analysis phases below
 - Skip the interactive prompt
@@ -43,8 +45,8 @@ Run an interactive feature planning session using structured reasoning phases.
   ```
 
 **If classification is `large` with `since` or `focused_directories`:**
-- When the user picks "analyze", pass `since` to `manifest_generate_feature_tree`
-- If `focused_directories` is set, run `manifest_generate_feature_tree` per focused directory
+- When the user picks "analyze", focus your codebase reading on the `focused_directories` if set
+- If `since` is set, use `git log --since` to understand recent changes and focus there
 - Show: "Analyzing [scope]..." instead of "Analyzing codebase..."
 - Otherwise offer the standard options below
 
@@ -59,9 +61,10 @@ Options:
 ```
 
 **If the user says "analyze":**
-- Call `manifest_generate_feature_tree` with `directory_path` set to the current working directory
-- This scans git history and code structure to discover existing capabilities
-- Use the returned markdown as input for the analysis phases below
+- Read the project's key files: README, package.json/Cargo.toml/etc., entry points, route definitions, and directory structure
+- Examine git log for recent activity areas
+- Identify the system's existing capabilities from code structure, exports, and route definitions
+- Use your findings as input for the analysis phases below
 - Tell the user: "Analyzed codebase. Found [N] capability areas. Proposing feature tree..."
 
 ### 3. Analyze -- Structured reasoning before designing
@@ -76,6 +79,8 @@ This is the critical step. For each explicit capability, ask: "What else must th
 - Capabilities the user assumes exist but didn't mention (e.g., "user uploads a file" implies the system can store and serve files)
 - Cross-cutting concerns that apply to multiple features (e.g., authorization, validation, error handling) -- these belong in parent-level context, not as separate features
 - Enabling capabilities that must exist first (e.g., "invite a team member" implies user management exists)
+
+If the project uses libraries or frameworks you're unsure about, look up their documentation (via web search, documentation tools, or other available resources) to inform your capability analysis.
 
 Important: Inferred items should be *capabilities*, not implementation tasks. "File Storage" is a capability. "Configure S3 bucket" is a task -- put that in the feature's spec, not as a separate feature.
 

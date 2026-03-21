@@ -9,7 +9,9 @@ Search for and display feature details.
 
 ## Arguments
 
-`$ARGUMENTS` - Search query to find the feature (title or content)
+The user's argument is: `$ARGUMENTS`
+
+If the argument above is not empty, it is a search query to find a feature by title or content.
 
 ## Steps
 
@@ -20,11 +22,11 @@ Search for and display feature details.
 
 2. Find the feature:
 
-   **If $ARGUMENTS is blank:**
+   **If no argument was given:**
    - Tell the user to provide a search query or use `/features` to browse features
 
-   **If $ARGUMENTS is provided:**
-   - Call `manifest_find_features` with `project_id` and `query` set to `$ARGUMENTS`
+   **If a search query argument was given (see Arguments above):**
+   - Call `manifest_find_features` with `project_id` and `query` set to the argument
    - If no matches found, tell the user and suggest checking spelling or using `/features`
 
 3. If multiple matches, list them and ask which one:

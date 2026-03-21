@@ -9,7 +9,9 @@ Mark a version as released.
 
 ## Arguments
 
-`$ARGUMENTS` - Version name to release (e.g., "v0.2.0"). If blank, releases the "now" version.
+The user's argument is: `$ARGUMENTS`
+
+If the argument above is not empty, it is the version name to release. If empty, releases the "now" version.
 
 ## Steps
 
@@ -23,11 +25,11 @@ Mark a version as released.
 
 3. Find the version to release:
 
-   **If $ARGUMENTS is provided:**
+   **If a version name argument was given (see Arguments above):**
    - Find the version matching the name
    - If not found, list available versions
 
-   **If $ARGUMENTS is blank:**
+   **If no argument was given:**
    - Use the "now" version (first unreleased)
    - If no unreleased versions, tell the user
 

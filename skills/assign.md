@@ -9,7 +9,9 @@ Assign a feature to a target version.
 
 ## Arguments
 
-`$ARGUMENTS` - Feature name and version name, e.g., "Router v0.2.0"
+The user's argument is: `$ARGUMENTS`
+
+If the argument above is not empty, it contains the feature name and version name (e.g., "Router v0.2.0").
 
 ## Steps
 
@@ -19,7 +21,7 @@ Assign a feature to a target version.
    - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
 
 2. Parse arguments:
-   - Extract feature search term and version name from $ARGUMENTS
+   - Extract feature search term and version name from the argument
    - If unclear, ask for clarification:
 
      ```

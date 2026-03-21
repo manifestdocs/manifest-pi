@@ -11,7 +11,9 @@ Permanently delete an archived feature.
 
 ## Arguments
 
-`$ARGUMENTS` - Name of the feature to delete
+The user's argument is: `$ARGUMENTS`
+
+If the argument above is not empty, it is the name of the feature to delete.
 
 ## Steps
 
@@ -21,7 +23,7 @@ Permanently delete an archived feature.
    - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
 
 2. Find the feature:
-   - Call `manifest_find_features` with `project_id` and `query` set to `$ARGUMENTS`
+   - Call `manifest_find_features` with `project_id` and `query` set to the argument
    - If no matches, tell the user and suggest `/features`
    - If multiple matches, list them and ask which one
 

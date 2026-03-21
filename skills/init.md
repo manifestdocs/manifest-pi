@@ -38,9 +38,9 @@ Initialize Manifest for a new or existing codebase. Adapts the flow based on pro
   ```
   Found existing project(s): [list names]
 
-  Is this directory part of one of these projects (monorepo)?
-  1. Yes, add it to [project name]
-  2. No, create a new project
+  Which project does this belong to?
+  1. A new project
+  2. An existing project (tell me which one)
   ```
 - If the user picks an existing project, call `manifest_add_project_directory` with `project_id` and `path` set to the current working directory, then exit early with:
   ```

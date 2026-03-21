@@ -1,11 +1,11 @@
 ---
 name: start
-description: Start working on a feature
+description: Start working on a feature — runs the full workflow through completion
 disable-model-invocation: true
 argument-hint: '[feature name or blank for next]'
 ---
 
-Begin work on a feature.
+Begin work on a feature and run the full workflow (SPEC → CLAIM → PLAN → BUILD → PROVE → CRITICAL REVIEW → DOCUMENT → COMPLETE) autonomously in one session. Do not stop partway — all steps must run. Failing tests, proof failures, and critical review findings are iteration points, not stopping points — fix the issue and iterate until everything passes, then complete immediately.
 
 **IMPORTANT:** This skill MUST be invoked whenever a user asks to implement, work on, or build a feature. This is required even if:
 
@@ -17,9 +17,13 @@ The `manifest_start_feature` tool records that work is beginning and returns the
 
 ## Arguments
 
-`$ARGUMENTS` - Optional feature name to start. If blank, starts the next priority feature.
+The user's argument is: `$ARGUMENTS`
+
+If the argument above is not empty, it is a feature name to search for. If empty, starts the next priority feature.
 
 ## Steps
+
+### Phase 1: SPEC + CLAIM
 
 1. Get the project for the current working directory:
    - Call `manifest_list_projects` with `directory_path` set to the current working directory
@@ -28,12 +32,12 @@ The `manifest_start_feature` tool records that work is beginning and returns the
 
 2. Find the feature to start:
 
-   **If $ARGUMENTS is provided:**
-   - Call `manifest_find_features` with `project_id` and `query` set to `$ARGUMENTS`
+   **If a feature name argument was given (see Arguments above):**
+   - Call `manifest_find_features` with `project_id` and `query` set to the argument
    - If no matches, tell the user and suggest `/features`
    - If multiple matches, list them and ask which one
 
-   **If $ARGUMENTS is blank:**
+   **If no argument was given:**
    - Call `manifest_get_next_feature` with the project ID
    - If no feature found, tell the user there's nothing to work on
 
@@ -129,13 +133,28 @@ The `manifest_start_feature` tool records that work is beginning and returns the
    [List child features with states]
    ```
 
-6. Remind the user:
+### Phase 2: PLAN
 
-   ```
-   When you're done, run /review, then use /complete to record your work.
+6. Plan mode is entered automatically after claiming the feature. Explore the codebase (read-only — no edits) and produce a numbered implementation plan under a "Plan:" header. If you find significant hidden complexity, include `[COMPLEX]` on its own line. If the feature involves libraries or frameworks you're unsure about, look up their documentation (via web search, documentation tools, or other available resources) before finalizing the plan.
 
-   Tip: Commit early and often with meaningful messages.
-   ```
+### Phase 3: BUILD
+
+7. After the plan is approved, implement the feature using a TDD red-green cycle:
+   - Write failing tests first
+   - Call `manifest_prove_feature` (expect red — non-zero exit code)
+   - Implement the code to make tests pass
+   - Call `manifest_prove_feature` again (expect green — exit code 0)
+   - Tick off acceptance criteria as you go by calling `manifest_update_feature` to change `- [ ]` to `- [x]`
+   - Commit early and often with meaningful messages
+
+### Phase 4: PROVE
+
+8. Record final test evidence:
+   - Call `manifest_prove_feature` with the test command, exit code, and structured results
+   - Must have exit_code 0 — if tests fail, fix and re-run
+   - Scope tests to THIS feature only
+
+{{include:_review-to-complete.md}}
 
 ## Important
 
