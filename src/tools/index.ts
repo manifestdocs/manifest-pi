@@ -33,7 +33,6 @@ import {
   handleDeleteFeature,
   handlePlan,
   handleGetProjectHistory,
-  handleGenerateFeatureTree,
   handleSync,
 } from './setup.js';
 import {
@@ -68,7 +67,6 @@ export {
   handleDeleteFeature,
   handlePlan,
   handleGetProjectHistory,
-  handleGenerateFeatureTree,
   handleSync,
   handleListVersions,
   handleCreateVersion,
@@ -390,16 +388,6 @@ function registerSetupTools(pi: ExtensionAPI, client: ManifestClient): void {
       limit: Type.Optional(Type.Number({ description: 'Max entries. Default 20.' })),
     }),
     execute: createExecuteHandler(client, handleGetProjectHistory),
-  });
-
-  pi.registerTool({
-    name: 'manifest_generate_feature_tree',
-    description: 'Analyze a codebase directory and generate a proposed feature tree from its structure.',
-    label: 'Generate Manifest feature tree from codebase analysis',
-    parameters: Type.Object({
-      directory_path: Type.String({ description: 'Absolute path to the project directory to analyze' }),
-    }),
-    execute: createExecuteHandler(client, handleGenerateFeatureTree),
   });
 
   pi.registerTool({
