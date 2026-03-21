@@ -1,6 +1,18 @@
 ### Phase 6: DOCUMENT
 
-Update the feature spec with `manifest_update_feature` to reflect what was actually built. Keep it concise — goal, what was implemented, key interfaces, any deviations from original spec. For change requests, make sure `details` reflects the new state (since `desired_details` is cleared automatically).
+1. Update the feature spec with `manifest_update_feature` to reflect what was actually built. Keep it concise — goal, what was implemented, key interfaces, any deviations from original spec. For change requests, make sure `details` reflects the new state (since `desired_details` is cleared automatically).
+
+2. Display a brief summary for the user explaining what this feature adds to the project and why it matters:
+
+   ```
+   ## What was built
+   [1-2 sentences: what capability the project gained]
+
+   ## What this enables
+   [1-2 sentences: what becomes possible now that wasn't before]
+   ```
+
+   This should be written from the project's perspective, not the implementation's. "Users can now filter by date range" not "Added a date filter component".
 
 ### Phase 7: COMPLETE
 
