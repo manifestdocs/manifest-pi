@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const PI_BUILTIN_COMMANDS = new Set([
   'settings', 'model', 'scoped-models', 'export', 'share', 'copy', 'name',
@@ -445,6 +448,44 @@ describe('Manifest Pi extension', () => {
     );
   });
 
+  it('exits plan mode when assess_plan returns tracked tier', async () => {
+    // Enter plan mode
+    const planCommand = pi.commands.find((c) => c.name === 'plan');
+    expect(planCommand).toBeDefined();
+    await planCommand!.handler('', createCommandContext());
+
+    // Verify plan mode is active (read-only tools)
+    expect(pi.api.setActiveTools).toHaveBeenCalledWith(
+      expect.arrayContaining(['read', 'bash', 'grep']),
+    );
+    const planModeTools = (pi.api.setActiveTools as any).mock.calls.at(-1)[0] as string[];
+    expect(planModeTools).not.toContain('write');
+
+    // Simulate assess_plan returning tracked tier
+    const ctx = createContext({ hasUI: false });
+    await emitHandlers(
+      pi.eventHandlers,
+      'tool_result',
+      {
+        type: 'tool_result',
+        isError: false,
+        toolName: 'manifest_assess_plan',
+        input: { feature_id: 'f1', plan: '1. Add tests\n2. Implement\n3. Record proof' },
+        content: [
+          {
+            type: 'text',
+            text: 'Plan assessment: tracked\nFeature: INFI-6 Test\nSteps: 3\nUnchecked acceptance criteria: 4\nEscalated: no\n\nPlan\n1. Add tests\n2. Implement\n3. Record proof',
+          },
+        ],
+      },
+      ctx,
+    );
+
+    // Should have exited plan mode — full tools restored
+    const lastToolCall = (pi.api.setActiveTools as any).mock.calls.at(-1)[0] as string[];
+    expect(lastToolCall.length).toBeGreaterThan(planModeTools.length);
+  });
+
   it('requires proof, Critical Reviewer pass, and spec update before completion', async () => {
     const ctx = createContext({ hasUI: false });
 
@@ -562,6 +603,209 @@ describe('Manifest Pi extension', () => {
       ctx,
     );
     expect(result).toBeUndefined();
+  });
+
+  describe('session_start proactive analysis', () => {
+    function mockFetch(responses: Record<string, { status: number; body: unknown }>) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+          for (const [pattern, resp] of Object.entries(responses)) {
+            if (url.includes(pattern)) {
+              return new Response(JSON.stringify(resp.body), { status: resp.status });
+            }
+          }
+          return new Response('', { status: 404 });
+        }),
+      );
+    }
+
+    const emptyTree = [{ id: 'root-1', title: 'Root', is_root: true, children: [] }];
+    const populatedTree = [
+      {
+        id: 'root-1',
+        title: 'Root',
+        is_root: true,
+        children: [{ id: 'f-1', title: 'Auth', is_root: false, children: [] }],
+      },
+    ];
+
+    it('offers codebase analysis when project has code but no features', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'manifest-test-'));
+      writeFileSync(join(tmp, 'index.ts'), 'export {}');
+      try {
+        mockFetch({
+          '/projects?directory=': { status: 200, body: { id: 'proj-1' } },
+          '/projects/proj-1/features': { status: 200, body: emptyTree },
+        });
+
+        const localPi = createMockPi();
+        const factory = await loadExtension();
+        await factory(localPi.api);
+
+        const ctx = createContext({ cwd: tmp });
+        ctx.ui.select.mockResolvedValueOnce('Analyze codebase and suggest features');
+
+        await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+        expect(ctx.ui.select).toHaveBeenCalledWith(
+          'This project has no features yet',
+          ['Analyze codebase and suggest features', 'Skip'],
+        );
+        expect(localPi.api.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ customType: 'manifest-skill', display: false }),
+          { triggerTurn: true },
+        );
+      } finally {
+        rmSync(tmp, { recursive: true });
+      }
+    });
+
+    it('offers PRD decompose when PRD exists and no code', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'manifest-test-'));
+      writeFileSync(join(tmp, 'PRD.md'), '# My Product');
+      try {
+        mockFetch({
+          '/projects?directory=': { status: 200, body: { id: 'proj-1' } },
+          '/projects/proj-1/features': { status: 200, body: emptyTree },
+        });
+
+        const localPi = createMockPi();
+        const factory = await loadExtension();
+        await factory(localPi.api);
+
+        const ctx = createContext({ cwd: tmp });
+        ctx.ui.select.mockResolvedValueOnce('Decompose PRD.md into features');
+
+        await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+        expect(ctx.ui.select).toHaveBeenCalledWith(
+          'This project has no features yet',
+          ['Decompose PRD.md into features', 'Skip'],
+        );
+        const sentContent = localPi.sentMessages[0]?.message?.content ?? '';
+        expect(sentContent).toContain('PRD.md');
+      } finally {
+        rmSync(tmp, { recursive: true });
+      }
+    });
+
+    it('skips prompt when empty project has no code and no PRD', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'manifest-test-'));
+      writeFileSync(join(tmp, 'package.json'), '{}');
+      try {
+        mockFetch({
+          '/projects?directory=': { status: 200, body: { id: 'proj-1' } },
+          '/projects/proj-1/features': { status: 200, body: emptyTree },
+        });
+
+        const localPi = createMockPi();
+        const factory = await loadExtension();
+        await factory(localPi.api);
+
+        const ctx = createContext({ cwd: tmp });
+        await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+        expect(ctx.ui.select).not.toHaveBeenCalled();
+      } finally {
+        rmSync(tmp, { recursive: true });
+      }
+    });
+
+    it('does nothing when project has features', async () => {
+      mockFetch({
+        '/projects?directory=': { status: 200, body: { id: 'proj-1' } },
+        '/projects/proj-1/features': { status: 200, body: populatedTree },
+      });
+
+      const localPi = createMockPi();
+      const factory = await loadExtension();
+      await factory(localPi.api);
+
+      const ctx = createContext();
+      await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+      expect(ctx.ui.select).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when no project found', async () => {
+      mockFetch({
+        '/projects?directory=': { status: 200, body: {} },
+      });
+
+      const localPi = createMockPi();
+      const factory = await loadExtension();
+      await factory(localPi.api);
+
+      const ctx = createContext();
+      await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+      expect(ctx.ui.select).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when API is unreachable', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('ECONNREFUSED');
+        }),
+      );
+
+      const localPi = createMockPi();
+      const factory = await loadExtension();
+      await factory(localPi.api);
+
+      const ctx = createContext();
+      await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+      expect(ctx.ui.select).not.toHaveBeenCalled();
+    });
+
+    it('does nothing in non-interactive mode', async () => {
+      mockFetch({
+        '/projects?directory=': { status: 200, body: { id: 'proj-1' } },
+        '/projects/proj-1/features': { status: 200, body: emptyTree },
+      });
+
+      const localPi = createMockPi();
+      const factory = await loadExtension();
+      await factory(localPi.api);
+
+      const ctx = createContext({ hasUI: false });
+      await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+      expect(ctx.ui.select).not.toHaveBeenCalled();
+      // Should not even call the API when non-interactive
+      expect(fetch).not.toHaveBeenCalledWith(
+        expect.stringContaining('/projects?directory='),
+        expect.anything(),
+      );
+    });
+
+    it('respects Skip choice', async () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'manifest-test-'));
+      writeFileSync(join(tmp, 'index.ts'), 'export {}');
+      try {
+        mockFetch({
+          '/projects?directory=': { status: 200, body: { id: 'proj-1' } },
+          '/projects/proj-1/features': { status: 200, body: emptyTree },
+        });
+
+        const localPi = createMockPi();
+        const factory = await loadExtension();
+        await factory(localPi.api);
+
+        const ctx = createContext({ cwd: tmp });
+        ctx.ui.select.mockResolvedValueOnce('Skip');
+
+        await emitHandlers(localPi.eventHandlers, 'session_start', { type: 'session_start' }, ctx);
+
+        expect(ctx.ui.select).toHaveBeenCalled();
+        expect(localPi.api.sendMessage).not.toHaveBeenCalled();
+      } finally {
+        rmSync(tmp, { recursive: true });
+      }
+    });
   });
 
   it('returns to implementation when Critical Reviewer records findings', async () => {

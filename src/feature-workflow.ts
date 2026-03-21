@@ -7,7 +7,7 @@
  */
 
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import type { AssistantMessage, TextContent } from '@mariozechner/pi-ai';
 import type {
   ExtensionAPI,
@@ -42,6 +42,19 @@ import {
 } from './hooks/tier.js';
 
 const PKG_NAME = '@manifestdocs/pi';
+
+/** Replace `{{include:filename.md}}` directives with file contents from skillsDir (max 3 levels deep). */
+function resolveIncludes(body: string, skillsDir: string, depth = 0): string {
+  if (depth > 3) return body;
+  return body.replace(/\{\{include:([^}]+)\}\}/g, (_match, filename: string) => {
+    try {
+      const content = readFileSync(join(skillsDir, filename.trim()), 'utf-8');
+      return resolveIncludes(content, skillsDir, depth + 1);
+    } catch {
+      return `[missing include: ${filename.trim()}]`;
+    }
+  });
+}
 
 function getCurrentVersion(): string {
   try {
@@ -80,6 +93,64 @@ function getTextContent(message: AssistantMessage): string {
     .filter((block): block is TextContent => block.type === 'text')
     .map((block) => block.text)
     .join('\n');
+}
+
+function extractToolResultText(event: ToolResultEvent): string {
+  return (event.content ?? [])
+    .filter((block): block is TextContent => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n');
+}
+
+const PRD_PATTERNS = [
+  'PRD.md', 'prd.md',
+  'SPEC.md', 'spec.md',
+  'REQUIREMENTS.md', 'requirements.md',
+];
+
+const CODE_EXTENSIONS = new Set([
+  '.ts', '.js', '.tsx', '.jsx', '.py', '.rs', '.go', '.rb',
+  '.java', '.kt', '.cs', '.swift', '.c', '.cpp', '.h',
+]);
+
+const SCAFFOLDING_FILES = new Set([
+  'package.json', 'tsconfig.json', 'cargo.toml', 'go.mod',
+  'pyproject.toml', 'gemfile', '.gitignore', 'readme.md',
+  'license', 'license.md', '.editorconfig',
+]);
+
+/** Find a PRD/spec file in the given directory. Returns filename or null. */
+function findPrdFile(cwd: string): string | null {
+  try {
+    const files = readdirSync(cwd);
+    for (const pattern of PRD_PATTERNS) {
+      if (files.includes(pattern)) return pattern;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Check if a directory has code beyond scaffolding (config files, package.json, etc.). */
+function hasCodeFiles(cwd: string): boolean {
+  try {
+    const entries = readdirSync(cwd, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name === 'src') return true;
+      if (entry.isDirectory() && entry.name === 'lib') return true;
+      if (entry.isDirectory() && entry.name === 'app') return true;
+      if (entry.isFile()) {
+        const ext = entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase();
+        if (CODE_EXTENSIONS.has(ext) && !SCAFFOLDING_FILES.has(entry.name.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 const MANIFEST_CONTEXT = `
@@ -146,6 +217,7 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
   const planController = createPlanModeController();
   let yoloMode = false;
   let completionSucceeded = false;
+  let decomposeSkillBody: string | null = null;
 
   const updatePromise = checkForUpdate();
 
@@ -175,7 +247,8 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
       continue;
     }
 
-    const body = parseFrontmatter(skillContent).body;
+    const body = resolveIncludes(parseFrontmatter(skillContent).body, skillsDir);
+    if (skillName === 'decompose') decomposeSkillBody = body;
     pi.registerCommand(commandName, {
       description,
       handler: async (args: string) => {
@@ -334,6 +407,35 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
           }
         } catch {
           // Best effort — ancestor context is supplementary
+        }
+        return;
+      }
+
+      // When assess_plan returns during plan mode, exit plan immediately
+      // so the agent can execute without being blocked by read-only restrictions.
+      if (
+        event.toolName === 'manifest_assess_plan' &&
+        planController.getState() === 'plan'
+      ) {
+        const text = extractToolResultText(event);
+        const tierMatch = text.match(/^Plan assessment: (auto|tracked|full)/m);
+        if (tierMatch) {
+          const tier = tierMatch[1] as PlanTier;
+          planController.setResolvedTier(tier);
+
+          // Extract todo items from the plan text in the result
+          const extracted = extractTodoItems(text);
+          if (extracted.length > 0) {
+            planController.setTodoItems(extracted);
+          }
+
+          if (tier === 'auto') {
+            planController.exit(pi, extCtx);
+          } else {
+            // tracked or full — enter execute mode with progress tracking
+            planController.enterExecute(pi, extCtx);
+          }
+          persistPlanState();
         }
         return;
       }
@@ -502,11 +604,7 @@ Work through ALL remaining steps autonomously without stopping. Do not pause bet
   pi.on('agent_end', async (event: AgentEndEvent, ctx: ExtensionContext) => {
     if (planController.getState() === 'execute') {
       const todos = planController.getTodoItems();
-      if (
-        completionSucceeded &&
-        todos.length > 0 &&
-        todos.every((t) => t.completed)
-      ) {
+      if (todos.length > 0 && todos.every((t) => t.completed)) {
         const completedList = todos.map((t) => `~~${t.text}~~`).join('\n');
         pi.sendMessage(
           {
@@ -664,6 +762,49 @@ Work through ALL remaining steps autonomously without stopping. Do not pause bet
           const allText = messages.map(getTextContent).join('\n');
           markCompletedSteps(allText, planController.getTodoItems());
         }
+      }
+    }
+
+    // Proactive: offer codebase analysis for empty projects
+    if (ctx.hasUI && decomposeSkillBody) {
+      try {
+        const lookup = await client.listProjectsByDirectory(ctx.cwd);
+        const projectId = lookup.project?.id ?? lookup.id;
+        if (projectId) {
+          const tree = await client.getFeatureTree(projectId);
+          const isEmpty =
+            tree.length === 1 &&
+            tree[0].is_root === true &&
+            tree[0].children.length === 0;
+          if (isEmpty) {
+            const prdFile = findPrdFile(ctx.cwd);
+            const hasCode = hasCodeFiles(ctx.cwd);
+
+            let action: string | null = null;
+            if (prdFile) {
+              action = `Decompose ${prdFile} into features`;
+            } else if (hasCode) {
+              action = 'Analyze codebase and suggest features';
+            }
+
+            if (action) {
+              const choice = await ctx.ui.select(
+                'This project has no features yet',
+                [action, 'Skip'],
+              );
+              if (choice === action) {
+                const arg = prdFile ?? '';
+                const instructions = decomposeSkillBody.replace(/\$ARGUMENTS/g, arg);
+                pi.sendMessage(
+                  { customType: 'manifest-skill', content: instructions, display: false },
+                  { triggerTurn: true },
+                );
+              }
+            }
+          }
+        }
+      } catch {
+        // Best effort -- don't block session startup if API is unreachable
       }
     }
   });
