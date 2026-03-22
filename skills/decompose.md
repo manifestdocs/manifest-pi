@@ -101,6 +101,7 @@ Now structure your analysis into a feature tree:
 - Name features by capability (e.g., "Router" not "Implement routing")
 - Group related features under parent nodes
 - Assign priorities (lower = implement first)
+- Before writing leaf details, call `manifest_get_template` to fetch the project's spec template. Use the template to format all leaf specs. If no custom template is configured, use the default format below.
 - **Write tier-appropriate details:**
   - Parent features: shared architectural context, patterns, constraints for children
   - Leaf features: focused specification (50-150 words) with this structure:
@@ -189,7 +190,43 @@ If the PRD was pasted directly into the root, distill it -- the detailed require
    - Each version should be a shippable increment that delivers usable value
 4. No features should remain in the backlog after this step
 
-### 9. Display result
+### 9. Discover and record existing tests (analyze only)
+
+**Skip this step if the input was a PRD, spec, or user description.** This step only applies when you analyzed an existing codebase in step 2.
+
+For each feature set to `implemented`, find and record existing test coverage:
+
+1. **Locate the test runner** -- check project config (package.json scripts, Makefile, Cargo.toml, pyproject.toml, Gemfile) to identify the test framework and run command.
+
+2. **Find test files** -- search for files matching common conventions:
+   - `*.test.ts`, `*.spec.ts`, `*.test.js`, `*.spec.js` (JS/TS)
+   - `*_test.go` (Go)
+   - `test_*.py`, `*_test.py` (Python)
+   - `*_spec.rb` (Ruby)
+   - `*_test.rs`, `tests/*.rs` (Rust)
+   - `*Test.java`, `*Spec.java` (Java)
+
+3. **Run the test suite** with verbose output so individual test names are visible:
+   - `vitest run --reporter=verbose` or `jest --verbose`
+   - `pytest -v`
+   - `go test -v ./...`
+   - `rspec --format documentation`
+   - `cargo test -- --nocapture`
+   - Run once for the whole project rather than per-feature.
+
+4. **Map tests to features** -- match test files and suite names to features using file paths, import statements, and test descriptions. A test file may cover multiple features; a feature may have tests in multiple files.
+
+5. **Record proof** -- for each implemented feature with matching tests, call `manifest_prove_feature` with:
+   - `command`: the test command run
+   - `exit_code`: the process exit code
+   - `test_suites`: structured results with individual test entries parsed from verbose output
+   - `evidence`: file paths of the covering test files
+   - `commit_sha`: current HEAD (`git rev-parse HEAD`)
+   Filter results per feature -- each prove call should only include tests relevant to that feature.
+
+6. **Skip gracefully** if no test files or runner are found. Record failing tests too -- they document existing coverage.
+
+### 10. Display result
 
 ```
 Created [N] features across [M] versions.

@@ -14,7 +14,7 @@ import {
   handleListProjects,
   handleFindFeatures,
   handleGetFeature,
-
+  handleGetTemplate,
   handleGetNextFeature,
   handleRenderFeatureTree,
   handleOrient,
@@ -52,7 +52,7 @@ export {
   handleListProjects,
   handleFindFeatures,
   handleGetFeature,
-
+  handleGetTemplate,
   handleGetNextFeature,
   handleRenderFeatureTree,
   handleOrient,
@@ -169,6 +169,16 @@ function registerDiscoveryTools(pi: ExtensionAPI, client: ManifestClient): void 
       state: Type.Optional(StringEnum(["proposed", "blocked", "in_progress", "implemented", "archived"] as const, { description: "Filter tree to branches containing leaves in this state" })),
     }),
     execute: createExecuteHandler(client, handleRenderFeatureTree),
+  });
+
+  pi.registerTool({
+    name: 'manifest_get_template',
+    description: "Get the project's spec template for writing feature details. Fetch before writing specs in decompose or update_feature.",
+    label: 'Get Manifest spec template',
+    parameters: Type.Object({
+      project_id: Type.String({ description: 'Project UUID' }),
+    }),
+    execute: createExecuteHandler(client, handleGetTemplate),
   });
 
   pi.registerTool({

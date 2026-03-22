@@ -27,10 +27,11 @@
     ]
   },
   "scripts": {
-    "build": "tsc",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "check": "tsc --noEmit"
+    "generate:content": "node ./scripts/generate-content.mjs",
+    "build": "node ./scripts/generate-content.mjs && tsc",
+    "test": "node ./scripts/generate-content.mjs && vitest",
+    "test:run": "node ./scripts/generate-content.mjs && vitest run",
+    "check": "node ./scripts/generate-content.mjs && tsc --noEmit"
   },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",

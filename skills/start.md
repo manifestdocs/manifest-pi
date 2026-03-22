@@ -5,7 +5,7 @@ disable-model-invocation: true
 argument-hint: '[feature name or blank for next]'
 ---
 
-Begin work on a feature and run the full workflow (SPEC → CLAIM → PLAN → BUILD → PROVE → CRITICAL REVIEW → DOCUMENT → COMPLETE) autonomously in one session. Do not stop partway — all steps must run. Failing tests, proof failures, and critical review findings are iteration points, not stopping points — fix the issue and iterate until everything passes, then complete immediately.
+{{include:_generated_start-overview.md}}
 
 **IMPORTANT:** This skill MUST be invoked whenever a user asks to implement, work on, or build a feature. This is required even if:
 

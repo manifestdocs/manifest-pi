@@ -40,6 +40,7 @@ import {
   resolveTier,
   type PlanTier,
 } from './hooks/tier.js';
+import { MANIFEST_CONTEXT } from './generated/content.js';
 
 const PKG_NAME = '@manifestdocs/pi';
 
@@ -152,49 +153,6 @@ function hasCodeFiles(cwd: string): boolean {
     return false;
   }
 }
-
-const MANIFEST_CONTEXT = `
-## Manifest
-
-Manifest is living documentation for the software you are building. It tracks features -- the capabilities your system provides -- as living documents that evolve with your codebase.
-
-ALWAYS pass \`directory_path\` (current working directory) to project/feature tools.
-
-### Domain terms
-
-- **feature**: a system capability in the tree. Leaf features are workable; parents are feature sets.
-- **feature set**: a parent with children. Cannot be started directly -- work on its leaf children.
-- **spec**: the details field -- user story + acceptance criteria. Read with manifest_get_feature, write with manifest_update_feature.
-- **proof**: recorded test output linked to a feature. Record with manifest_prove_feature.
-- **tree**: the full feature structure. Use manifest_render_feature_tree.
-- **version / milestone**: a semantic version grouping features. Use manifest_list_versions.
-
-Feature states: proposed, in_progress, implemented, blocked, archived.
-
-### Feature workflow
-
-The workflow runs autonomously from CLAIM through COMPLETE in one session -- do not stop partway. All 8 steps must run. Failing tests, proof failures, and critical review findings are iteration points, not stopping points -- fix the issue and iterate (build, prove, review) until everything passes, then complete immediately.
-
-1. **SPEC** -- Read the feature with manifest_get_feature. If the spec is thin, write one with manifest_update_feature before proceeding.
-2. **CLAIM** -- Call manifest_start_feature. It validates the spec and returns your specification. You will enter plan mode automatically.
-3. **PLAN** -- Read-only mode. Explore the codebase, then produce a numbered plan under a "Plan:" header. Include [COMPLEX] if you find significant hidden complexity.
-4. **BUILD** -- After plan approval, write tools unlock. TDD red-green cycle: write failing tests, call manifest_prove_feature (red), implement, prove again (green). Tick off acceptance criteria as you go.
-5. **PROVE** -- Record final test evidence with manifest_prove_feature (must have exit_code 0). Scope tests to THIS feature only.
-6. **CRITICAL REVIEW** -- Use manifest_verify_feature to inspect implementation against spec. Call manifest_record_verification with findings (empty comments = pass). If issues found, return to BUILD and fix them.
-7. **DOCUMENT** -- Update the feature spec with manifest_update_feature to reflect what was actually built.
-8. **COMPLETE** -- IMMEDIATELY call manifest_complete_feature with a summary and commit SHAs. Do NOT ask permission or wait for confirmation.
-
-### When NOT to use the feature workflow
-
-- One-off tasks ("update the header", "fix the typo") -- handle directly.
-- Bug fixes -- work in a TDD manner without the full workflow.
-- Read-only queries ("show the tree", "what's next") -- use Manifest tools directly.
-
-### Output rules
-
-Some tools return pre-formatted text (manifest_render_feature_tree, manifest_get_project_history). Do NOT repeat, summarize, or reformat their output -- the tool result is already displayed to the user.
-
-`;
 
 const COMMAND_SKILLS: Array<string | { skill: string; command: string }> = [
   'next',
