@@ -21,6 +21,7 @@ import type {
   ContextEvent,
 } from '@mariozechner/pi-coding-agent';
 import { parseFrontmatter } from '@mariozechner/pi-coding-agent';
+import { ManifestAuthManager, type AuthStatus } from './auth.js';
 import { ManifestClient } from './client.js';
 import { lodBreadcrumb, featureWebUrl } from './format.js';
 import { registerAllTools } from './tools/index.js';
@@ -166,11 +167,43 @@ const COMMAND_SKILLS: Array<string | { skill: string; command: string }> = [
   'versions',
 ];
 
+function formatAuthStatus(status: AuthStatus): string {
+  if (!status.authenticated) {
+    return `Manifest auth: not authenticated\nBase URL: ${status.baseUrl}`;
+  }
+
+  const lines = [
+    `Manifest auth: ${status.source}`,
+    `Base URL: ${status.baseUrl}`,
+  ];
+
+  if (status.userId) lines.push(`User: ${status.userId}`);
+  if (status.orgId) lines.push(`Org: ${status.orgId}`);
+  if (status.role) lines.push(`Role: ${status.role}`);
+  if (status.permissions.length > 0) lines.push(`Permissions: ${status.permissions.join(', ')}`);
+  if (status.expiresAt) lines.push(`Expires: ${status.expiresAt}`);
+  if (status.source === 'local-api-key') lines.push('Mode: local dev API key');
+
+  return lines.join('\n');
+}
+
 export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
+  const configuredBaseUrl = process.env.MANIFEST_URL?.trim();
   const port = parseInt(process.env.MANIFEST_PORT ?? '4242', 10);
-  const baseUrl = `http://localhost:${port}`;
-  const apiKey = process.env.MANIFEST_API_KEY;
-  const client = new ManifestClient({ baseUrl, apiKey });
+  const baseUrl = configuredBaseUrl && configuredBaseUrl.length > 0
+    ? configuredBaseUrl
+    : `http://localhost:${port}`;
+  const authManager = new ManifestAuthManager({
+    baseUrl,
+    clientId: process.env.WORKOS_CLIENT_ID,
+    accessToken: process.env.MANIFEST_ACCESS_TOKEN,
+    apiKey: process.env.MANIFEST_API_KEY,
+    storagePath: process.env.MANIFEST_AUTH_PATH,
+  });
+  const client = new ManifestClient({
+    baseUrl,
+    getAccessToken: () => authManager.getAccessToken(),
+  });
   const workflowState = new WorkflowState();
   const planController = createPlanModeController();
   let yoloMode = false;
@@ -286,6 +319,69 @@ export default async function featureWorkflow(pi: ExtensionAPI): Promise<void> {
             ? 'YOLO mode on -- agent will implement plans without approval.'
             : 'YOLO mode off -- agent will pause for plan approval.',
         );
+      }
+    },
+  });
+
+  pi.registerCommand('manifest-login', {
+    description: 'Authenticate Manifest Cloud access with WorkOS device login',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      try {
+        const status = await authManager.login({
+          onPrompt: async (prompt) => {
+            if (!ctx.hasUI) return;
+            const destination = prompt.verificationUriComplete ?? prompt.verificationUri;
+            ctx.ui.notify(
+              `Open ${destination} and complete Manifest login${prompt.verificationUriComplete ? '.' : ` with code ${prompt.userCode}.`}`,
+              'info',
+            );
+          },
+        });
+
+        if (ctx.hasUI) {
+          ctx.ui.notify(formatAuthStatus(status), 'info');
+        }
+      } catch (error) {
+        if (ctx.hasUI) {
+          ctx.ui.notify(
+            error instanceof Error ? error.message : 'Manifest login failed.',
+            'error',
+          );
+        }
+      }
+    },
+  });
+
+  pi.registerCommand('manifest-logout', {
+    description: 'Remove locally stored Manifest Cloud credentials',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      const removed = authManager.logout();
+      if (ctx.hasUI) {
+        ctx.ui.notify(
+          removed
+            ? 'Manifest Cloud credentials removed from local storage.'
+            : 'No stored Manifest Cloud credentials found.',
+          'info',
+        );
+      }
+    },
+  });
+
+  pi.registerCommand('manifest-whoami', {
+    description: 'Show the current Manifest auth identity and token source',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      try {
+        const status = await authManager.getStatus();
+        if (ctx.hasUI) {
+          ctx.ui.notify(formatAuthStatus(status), 'info');
+        }
+      } catch (error) {
+        if (ctx.hasUI) {
+          ctx.ui.notify(
+            error instanceof Error ? error.message : 'Unable to load Manifest auth status.',
+            'error',
+          );
+        }
       }
     },
   });

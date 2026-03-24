@@ -80,6 +80,9 @@ export class ConnectionError extends Error {
 export interface ManifestClientConfig {
   baseUrl?: string;
   apiKey?: string;
+  accessToken?: string;
+  getAccessToken?: () => string | undefined | Promise<string | undefined>;
+  defaultHeaders?: Record<string, string>;
 }
 
 const DEFAULT_BASE_URL = 'http://localhost:4242';
@@ -90,12 +93,16 @@ const DEFAULT_BASE_URL = 'http://localhost:4242';
 
 export class ManifestClient {
   private baseUrl: string;
-  private apiKey?: string;
+  private accessToken?: string;
+  private getAccessTokenFn?: () => string | undefined | Promise<string | undefined>;
+  private defaultHeaders: Record<string, string>;
 
   constructor(config?: ManifestClientConfig) {
     const raw = config?.baseUrl ?? DEFAULT_BASE_URL;
     this.baseUrl = raw.endsWith('/') ? raw.slice(0, -1) : raw;
-    this.apiKey = config?.apiKey;
+    this.accessToken = config?.accessToken ?? config?.apiKey;
+    this.getAccessTokenFn = config?.getAccessToken;
+    this.defaultHeaders = { ...(config?.defaultHeaders ?? {}) };
   }
 
   get webUrl(): string { return this.baseUrl; }
@@ -111,11 +118,16 @@ export class ManifestClient {
   ): Promise<T> {
     const url = `${this.apiUrl}${path}`;
     const headers: Record<string, string> = {
+      ...this.defaultHeaders,
       'Content-Type': 'application/json',
     };
 
-    if (this.apiKey) {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
+    const accessToken = this.getAccessTokenFn
+      ? await this.getAccessTokenFn()
+      : this.accessToken;
+
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
     }
 
     const options: RequestInit = { method, headers };

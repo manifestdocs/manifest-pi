@@ -20,6 +20,7 @@ pnpm check                      # Type-check without emitting
 
 - **`src/types.ts`** — Domain types (ported from manifest-svelte, zero dependencies)
 - **`src/client.ts`** — HTTP client wrapping fetch() with typed methods
+- **`src/auth.ts`** — WorkOS device-flow auth manager + local credential storage
 - **`src/format.ts`** — Text rendering (trees, tables, state symbols, time buckets)
 - **`src/tools/*.ts`** — Tool definitions using TypeBox schemas, registered via `pi.registerTool()`
 - **`src/feature-workflow.ts`** — Main extension implementation
@@ -39,6 +40,14 @@ pnpm check                      # Type-check without emitting
 ## Tool Naming
 
 All tools prefixed with `manifest_`: `manifest_list_projects`, `manifest_start_feature`, etc.
+
+## Auth Configuration
+
+- `MANIFEST_URL` — API base URL. Defaults to `http://localhost:4242`.
+- `MANIFEST_ACCESS_TOKEN` — Preferred bearer token for cloud API access.
+- `MANIFEST_API_KEY` — Localhost-only API key fallback for local dev servers.
+- `WORKOS_CLIENT_ID` — Required for device-flow login in cloud mode.
+- `MANIFEST_AUTH_PATH` — Optional override for local token storage path.
 
 ## Coding Guidelines
 

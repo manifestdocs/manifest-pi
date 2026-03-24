@@ -89,6 +89,16 @@ describe('ManifestClient', () => {
       const [, opts] = mockFetch.mock.calls[0];
       expect(opts.headers['Authorization']).toBe('Bearer test-key-123');
     });
+
+    it('resolves auth header from async token provider', async () => {
+      const authed = new ManifestClient({
+        getAccessToken: async () => 'user-token-456',
+      });
+      mockFetch.mockResolvedValueOnce(jsonResponse([]));
+      await authed.listProjects();
+      const [, opts] = mockFetch.mock.calls[0];
+      expect(opts.headers['Authorization']).toBe('Bearer user-token-456');
+    });
   });
 
   describe('POST requests', () => {

@@ -244,6 +244,9 @@ describe('Manifest Pi extension', () => {
         'plan',
         'todos',
         'yolo',
+        'manifest-login',
+        'manifest-logout',
+        'manifest-whoami',
       ]),
     );
     expect(names).not.toContain('tree');
@@ -278,6 +281,29 @@ describe('Manifest Pi extension', () => {
     expect(message.display).toBe(false);
     expect(message.content).toContain('manifest_get_next_feature');
     expect(options.triggerTurn).toBe(true);
+  });
+
+  it('shows auth status through the manifest-whoami command', async () => {
+    const authDir = mkdtempSync(join(tmpdir(), 'manifest-pi-auth-'));
+    process.env.MANIFEST_API_KEY = 'local-dev-key';
+    process.env.MANIFEST_AUTH_PATH = join(authDir, 'auth.json');
+
+    const localPi = createMockPi();
+    await extensionFactory(localPi.api);
+    const whoamiCommand = localPi.commands.find((c) => c.name === 'manifest-whoami');
+    expect(whoamiCommand).toBeDefined();
+
+    const ctx = createCommandContext();
+    await whoamiCommand!.handler('', ctx);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining('Mode: local dev API key'),
+      'info',
+    );
+
+    delete process.env.MANIFEST_API_KEY;
+    delete process.env.MANIFEST_AUTH_PATH;
+    rmSync(authDir, { recursive: true, force: true });
   });
 
   it('command handlers replace $ARGUMENTS and strip frontmatter', async () => {
