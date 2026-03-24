@@ -24,7 +24,7 @@ describe('generated Pi content', () => {
   it('generates the shipped prompt asset', () => {
     const prompt = readFileSync(PROMPT_PATH, 'utf-8');
     expect(prompt).toContain('You are the orchestrator.');
-    expect(prompt).toContain('Every feature must reach COMPLETE.');
+    expect(prompt).toContain('All 4 phases must run');
   });
 
   it('injects the shared workflow overview into the start skill', () => {

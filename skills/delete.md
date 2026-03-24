@@ -17,17 +17,12 @@ If the argument above is not empty, it is the name of the feature to delete.
 
 ## Steps
 
-1. Get the project for the current working directory:
-   - Call `manifest_list_projects` with `directory_path` set to the current working directory
-   - If no project found, tell the user to run `/init` first
-   - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
-
-2. Find the feature:
+1. Find the feature:
    - Call `manifest_find_features` with `project_id` and `query` set to the argument
    - If no matches, tell the user and suggest `/features`
    - If multiple matches, list them and ask which one
 
-3. Check the feature state:
+2. Check the feature state:
    - If the feature is NOT archived, refuse and say:
      ```
      "[Title]" is not archived (state: [state]).
@@ -38,7 +33,7 @@ If the argument above is not empty, it is the name of the feature to delete.
      To archive it first: update the feature state to 'archived', then delete.
      ```
 
-4. Confirm with the user:
+3. Confirm with the user:
    ```
    Delete "[Title]" permanently?
 
@@ -48,9 +43,9 @@ If the argument above is not empty, it is the name of the feature to delete.
    Type "yes" to confirm.
    ```
 
-5. If confirmed, call `manifest_delete_feature` with the `feature_id`.
+4. If confirmed, call `manifest_delete_feature` with the `feature_id`.
 
-6. Display result:
+5. Display result:
    ```
    Deleted: [Title]
    ```

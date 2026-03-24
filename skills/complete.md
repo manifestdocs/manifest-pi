@@ -10,12 +10,7 @@ Enter the feature workflow at the DOCUMENT phase and continue through COMPLETE. 
 
 ## Steps
 
-1. Get the project for the current working directory:
-   - Call `manifest_list_projects` with `directory_path` set to the current working directory
-   - If no project found, tell the user to run `/init` first
-   - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
-
-2. Find the in-progress feature:
+1. Find the in-progress feature:
    - Call `manifest_find_features` with `project_id` and `state: "in_progress"`
    - If no in-progress features, tell the user there's nothing to complete
    - If multiple in-progress features, list them and ask which one

@@ -8,15 +8,10 @@ Display version roadmap for the current project.
 
 ## Steps
 
-1. Get the project for the current working directory:
-   - Call `manifest_list_projects` with `directory_path` set to the current working directory
-   - If no project found, tell the user to run `/init` first
-   - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
-
-2. List versions:
+1. List versions:
    - Call `manifest_list_versions` with the project ID
 
-3. Format the output as a table showing:
+2. Format the output as a table showing:
    - Version name
    - Status: "released", "now" (current focus), "next" (queued), or "later"
    - Feature count

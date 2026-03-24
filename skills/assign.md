@@ -15,12 +15,7 @@ If the argument above is not empty, it contains the feature name and version nam
 
 ## Steps
 
-1. Get the project for the current working directory:
-   - Call `manifest_list_projects` with `directory_path` set to the current working directory
-   - If no project found, tell the user to run `/init` first
-   - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
-
-2. Parse arguments:
+1. Parse arguments:
    - Extract feature search term and version name from the argument
    - If unclear, ask for clarification:
 
@@ -31,19 +26,19 @@ If the argument above is not empty, it contains the feature name and version nam
      Example: /assign Router v0.2.0
      ```
 
-3. Find the feature:
+2. Find the feature:
    - Call `manifest_find_features` with `project_id` and `query`
    - If no matches or multiple matches, clarify with user
 
-4. Find the version:
+3. Find the version:
    - Call `manifest_list_versions` with the project ID
    - Match by name
    - If not found, list available versions
 
-5. Assign the feature:
+4. Assign the feature:
    - Call `manifest_set_feature_version` with `feature_id` and `version_id`
 
-6. Display result:
+5. Display result:
 
    ```
    Assigned: [Feature title] → [Version name]

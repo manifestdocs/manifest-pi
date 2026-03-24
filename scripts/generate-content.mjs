@@ -2,9 +2,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  renderCodingGuidelinesTemplate,
   renderPiManifestContext,
   renderPiPromptManifest,
   renderPiStartSkillOverview,
+  renderPiTestDiscovery,
 } from '../../manifest-agent-content/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -24,6 +26,14 @@ export const MANIFEST_CONTEXT = ${JSON.stringify(renderPiManifestContext())} as 
   {
     path: join(projectRoot, 'skills', '_generated_start-overview.md'),
     content: `${renderPiStartSkillOverview()}\n`,
+  },
+  {
+    path: join(projectRoot, 'skills', '_generated_test-discovery.md'),
+    content: `${renderPiTestDiscovery()}\n`,
+  },
+  {
+    path: join(projectRoot, 'skills', '_generated_coding-guidelines.md'),
+    content: `${renderCodingGuidelinesTemplate()}\n`,
   },
 ];
 

@@ -15,15 +15,10 @@ If the argument above is not empty, it is the version name to release. If empty,
 
 ## Steps
 
-1. Get the project for the current working directory:
-   - Call `manifest_list_projects` with `directory_path` set to the current working directory
-   - If no project found, tell the user to run `/init` first
-   - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
-
-2. Get versions:
+1. Get versions:
    - Call `manifest_list_versions` with the project ID
 
-3. Find the version to release:
+2. Find the version to release:
 
    **If a version name argument was given (see Arguments above):**
    - Find the version matching the name
@@ -33,7 +28,7 @@ If the argument above is not empty, it is the version name to release. If empty,
    - Use the "now" version (first unreleased)
    - If no unreleased versions, tell the user
 
-4. Show version status:
+3. Show version status:
 
    ```
    Releasing: [version name]
@@ -46,16 +41,16 @@ If the argument above is not empty, it is the version name to release. If empty,
    [N] features implemented, [M] still in progress.
    ```
 
-5. Confirm if there are incomplete features:
+4. Confirm if there are incomplete features:
 
    ```
    WARNING: Some features are not yet implemented. Release anyway?
    ```
 
-6. Release the version:
+5. Release the version:
    - Call `manifest_release_version` with the version ID
 
-7. Display result:
+6. Display result:
 
    ```
    Released: [version name]

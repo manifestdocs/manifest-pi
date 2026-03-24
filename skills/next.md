@@ -8,15 +8,10 @@ Show the next feature to work on.
 
 ## Steps
 
-1. Get the project for the current working directory:
-   - Call `manifest_list_projects` with `directory_path` set to the current working directory
-   - If no project found, tell the user to run `/init` first
-   - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
-
-2. Get the next workable feature:
+1. Get the next workable feature:
    - Call `manifest_get_next_feature` with the project ID
 
-3. Display the result:
+2. Display the result:
 
 If a feature is found, show:
 

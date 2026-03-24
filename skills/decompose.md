@@ -17,9 +17,6 @@ If the argument above is not empty, it is a path to a PRD, spec, or feature desc
 
 ### 1. Orient -- Understand the project context
 
-- Call `manifest_list_projects` with `directory_path` set to the current working directory
-- If no project found, offer to run `/init` first
-- If an MCP connection error occurs, the server is not running -- tell the user to start it with `manifest serve`
 - Call `manifest_render_feature_tree` to see what features already exist
 - Use `manifest_find_features` to locate the root feature or relevant parent feature set, then call `manifest_get_feature` with `view="full"` to read project-wide and feature-set context from the breadcrumb
 - This context constrains your decomposition -- don't propose features that duplicate existing ones, and respect established patterns
@@ -101,27 +98,10 @@ Now structure your analysis into a feature tree:
 - Name features by capability (e.g., "Router" not "Implement routing")
 - Group related features under parent nodes
 - Assign priorities (lower = implement first)
-- Before writing leaf details, call `manifest_get_template` to fetch the project's spec template. Use the template to format all leaf specs. If no custom template is configured, use the default format below.
+- Before writing leaf details, call `manifest_get_template` to fetch the project's spec template. Write leaf specs per the Spec Format in your system instructions.
 - **Write tier-appropriate details:**
   - Parent features: shared architectural context, patterns, constraints for children
-  - Leaf features: focused specification (50-150 words) with this structure:
-    1. **User story** opening line: "As a [user], I can [capability] so that [benefit]."
-    2. Brief context (1-2 sentences): key behavior, constraints, or edge cases.
-    3. **Acceptance criteria** as checkbox items (3-5): concrete assertions verifiable in specs and tests.
-  - Write what agents cannot discover from code (business rules, edge cases, product intent). Do NOT include file paths, directory layouts, or implementation approach.
-  - **Never repeat the feature title in the details** -- the title is displayed separately in the UI
-
-  Example of a good leaf spec:
-
-  > As a user, I can mark a todo as complete so that I can track my progress.
-  >
-  > Tapping the checkbox next to a todo toggles its completed state. Completed todos display with strikethrough styling.
-  >
-  > - [ ] Checkbox appears to the left of each todo item
-  > - [ ] Clicking the checkbox toggles the `completed` boolean
-  > - [ ] Completed todos render with line-through text decoration
-  > - [ ] Toggling is immediate -- no confirmation dialog
-
+  - Leaf features: focused specification following the Spec Format (user story, context, acceptance criteria)
 - Parent details flow to all children via breadcrumb -- put shared decisions there, not in every leaf
 
 ### 5. Present the proposal
@@ -196,35 +176,7 @@ If the PRD was pasted directly into the root, distill it -- the detailed require
 
 For each feature set to `implemented`, find and record existing test coverage:
 
-1. **Locate the test runner** -- check project config (package.json scripts, Makefile, Cargo.toml, pyproject.toml, Gemfile) to identify the test framework and run command.
-
-2. **Find test files** -- search for files matching common conventions:
-   - `*.test.ts`, `*.spec.ts`, `*.test.js`, `*.spec.js` (JS/TS)
-   - `*_test.go` (Go)
-   - `test_*.py`, `*_test.py` (Python)
-   - `*_spec.rb` (Ruby)
-   - `*_test.rs`, `tests/*.rs` (Rust)
-   - `*Test.java`, `*Spec.java` (Java)
-
-3. **Run the test suite** with verbose output so individual test names are visible:
-   - `vitest run --reporter=verbose` or `jest --verbose`
-   - `pytest -v`
-   - `go test -v ./...`
-   - `rspec --format documentation`
-   - `cargo test -- --nocapture`
-   - Run once for the whole project rather than per-feature.
-
-4. **Map tests to features** -- match test files and suite names to features using file paths, import statements, and test descriptions. A test file may cover multiple features; a feature may have tests in multiple files.
-
-5. **Record proof** -- for each implemented feature with matching tests, call `manifest_prove_feature` with:
-   - `command`: the test command run
-   - `exit_code`: the process exit code
-   - `test_suites`: structured results with individual test entries parsed from verbose output
-   - `evidence`: file paths of the covering test files
-   - `commit_sha`: current HEAD (`git rev-parse HEAD`)
-   Filter results per feature -- each prove call should only include tests relevant to that feature.
-
-6. **Skip gracefully** if no test files or runner are found. Record failing tests too -- they document existing coverage.
+{{include:_generated_test-discovery.md}}
 
 ### 10. Display result
 

@@ -25,12 +25,7 @@ If the argument above is not empty, it is a feature name to search for. If empty
 
 ### Phase 1: SPEC + CLAIM
 
-1. Get the project for the current working directory:
-   - Call `manifest_list_projects` with `directory_path` set to the current working directory
-   - If no project found, tell the user to run `/init` first
-   - If an MCP connection error occurs, the server is not running — tell the user to start it with `manifest serve`
-
-2. Find the feature to start:
+1. Find the feature to start:
 
    **If a feature name argument was given (see Arguments above):**
    - Call `manifest_find_features` with `project_id` and `query` set to the argument
@@ -41,7 +36,7 @@ If the argument above is not empty, it is a feature name to search for. If empty
    - Call `manifest_get_next_feature` with the project ID
    - If no feature found, tell the user there's nothing to work on
 
-3. Start the feature:
+2. Start the feature:
    - Call `manifest_start_feature` with the feature ID
    - **If `manifest_start_feature` returns an error** (feature has no details):
      - Display the error message — it includes the expected spec format
@@ -55,7 +50,7 @@ If the argument above is not empty, it is a feature name to search for. If empty
      - The response includes both `details` (current state) and `desired_details` (what's wanted)
      - Compare the two to understand what needs to change
 
-4. **Set up git branch:**
+3. **Set up git branch:**
    - Check for uncommitted changes: `git status --porcelain`
    - If there are uncommitted changes, warn the user and ask how to proceed:
      ```
@@ -74,7 +69,7 @@ If the argument above is not empty, it is a feature name to search for. If empty
    - Derive `<slug>` from feature title: lowercase, spaces to hyphens, remove special chars
      - Example: "OAuth Login" → `feature/oauth-login`
 
-5. Display the result based on the feature tier (check `feature_tier` in the response):
+4. Display the result based on the feature tier (check `feature_tier` in the response):
 
    **For change requests (implemented feature with desired_details):**
 
@@ -135,11 +130,11 @@ If the argument above is not empty, it is a feature name to search for. If empty
 
 ### Phase 2: PLAN
 
-6. Plan mode is entered automatically after claiming the feature. Explore the codebase (read-only — no edits) and produce a numbered implementation plan under a "Plan:" header. If you find significant hidden complexity, include `[COMPLEX]` on its own line. If the feature involves libraries or frameworks you're unsure about, look up their documentation (via web search, documentation tools, or other available resources) before finalizing the plan.
+5. Plan mode is entered automatically after claiming the feature. Explore the codebase (read-only — no edits) and produce a numbered implementation plan under a "Plan:" header. If you find significant hidden complexity, include `[COMPLEX]` on its own line. If the feature involves libraries or frameworks you're unsure about, look up their documentation (via web search, documentation tools, or other available resources) before finalizing the plan.
 
 ### Phase 3: BUILD
 
-7. After the plan is approved, implement the feature using a TDD red-green cycle:
+6. After the plan is approved, implement the feature using a TDD red-green cycle:
    - Write failing tests first
    - Call `manifest_prove_feature` (expect red — non-zero exit code)
    - Implement the code to make tests pass
@@ -149,7 +144,7 @@ If the argument above is not empty, it is a feature name to search for. If empty
 
 ### Phase 4: PROVE
 
-8. Record final test evidence:
+7. Record final test evidence:
    - Call `manifest_prove_feature` with the test command, exit code, and structured results
    - Must have exit_code 0 — if tests fail, fix and re-run
    - Scope tests to THIS feature only
